@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: songpacketer
+      POSTGRES_USER: songpacketer
+      POSTGRES_PASSWORD: songpacketer
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U songpacketer -d songpacketer"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_SECRET_KEY: dev-secret-key
+      POSTGRES_DB: songpacketer
+      POSTGRES_USER: songpacketer
+      POSTGRES_PASSWORD: songpacketer
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      SONGBASE_API_URL: https://songbase.life/api/v2/app_data
+      SONGBASE_API_TOKEN: ""
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: npm run dev
+
+volumes:
+  postgres_data:
