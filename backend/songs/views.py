@@ -5,6 +5,7 @@ from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.html import escape
+from django.db import transaction
 from requests import RequestException
 from rest_framework import status
 from rest_framework.response import Response
@@ -12,7 +13,7 @@ from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
 from .imports import sync_songbase_english
-from .models import Song, SongVersion
+from .models import Song, SongPacket, SongPacketEditEvent, SongPacketVersion, SongVersion
 from .pdf import (
     RenderedSong,
     chordpro_to_lines,
@@ -22,6 +23,13 @@ from .pdf import (
 )
 from .serializers import (
     MatchRequestSerializer,
+    SongPacketActivateVersionSerializer,
+    SongPacketCreateSerializer,
+    SongPacketEditEventSerializer,
+    SongPacketSaveVersionSerializer,
+    SongPacketSerializer,
+    SongPacketStateUpdateSerializer,
+    SongPacketVersionMetaSerializer,
     PacketRequestSerializer,
     SongVersionSerializer,
 )
@@ -33,6 +41,70 @@ logger = logging.getLogger(__name__)
 def _debug_event(message: str) -> None:
     print(message, flush=True)
     logger.info(message)
+
+
+def _ensure_session_key(request) -> str:
+    if not request.session.session_key:
+        request.session.save()
+    return request.session.session_key
+
+
+def _packet_queryset_for_session(request):
+    session_key = _ensure_session_key(request)
+    return SongPacket.objects.filter(session_key=session_key).order_by('-updated_at')
+
+
+def _packet_for_session_or_404(request, packet_id: int) -> SongPacket:
+    return get_object_or_404(_packet_queryset_for_session(request), id=packet_id)
+
+
+def _extract_snapshot_metrics(snapshot: dict) -> tuple[int | None, int | None]:
+    packet_stats = snapshot.get('packet_stats', {}) if isinstance(snapshot, dict) else {}
+    if not isinstance(packet_stats, dict):
+        packet_stats = {}
+    pages = packet_stats.get('pages')
+    song_spills = packet_stats.get('songSpills')
+    try:
+        pages = int(pages) if pages is not None else None
+    except (TypeError, ValueError):
+        pages = None
+    try:
+        song_spills = int(song_spills) if song_spills is not None else None
+    except (TypeError, ValueError):
+        song_spills = None
+    return pages, song_spills
+
+
+@transaction.atomic
+def _create_packet_version(packet: SongPacket, snapshot: dict, description: str = '') -> SongPacketVersion:
+    previous = packet.versions.order_by('-version_number').first()
+    next_number = (previous.version_number + 1) if previous else 1
+    pages, song_spills = _extract_snapshot_metrics(snapshot or {})
+    version = SongPacketVersion.objects.create(
+        packet=packet,
+        version_number=next_number,
+        snapshot=snapshot or {},
+        description=description,
+        page_count=pages,
+        song_spills=song_spills,
+        previous_version=previous,
+    )
+    packet.latest_version_number = next_number
+    packet.current_version = version
+    packet.current_state = snapshot or {}
+    packet.save(update_fields=['latest_version_number', 'current_version', 'current_state', 'updated_at'])
+    return version
+
+
+def _packet_payload(packet: SongPacket) -> dict:
+    versions = packet.versions.order_by('-version_number')
+    events = packet.edit_events.order_by('-created_at')
+    return {
+        'packet': SongPacketSerializer(packet).data,
+        'state': packet.current_state,
+        'versions': SongPacketVersionMetaSerializer(versions, many=True).data,
+        'edit_history': SongPacketEditEventSerializer(events, many=True).data,
+    }
 
 
 class ApiRootView(APIView):
@@ -47,6 +119,10 @@ class ApiRootView(APIView):
                 'packet_preview': reverse('packet-preview', request=request),
                 'packet_generate': reverse('packet-generate', request=request),
                 'packet_optimize_order': reverse('packet-optimize-order', request=request),
+                'song_packets': reverse('song-packets', request=request),
+                'song_packet_template': reverse('song-packet-detail', args=[1], request=request),
+                'song_packet_versions_template': reverse('song-packet-versions', args=[1], request=request),
+                'song_packet_history_template': reverse('song-packet-history', args=[1], request=request),
                 'docs': {
                     'songbase_source_sample': {
                         'method': 'GET',
@@ -82,9 +158,202 @@ class ApiRootView(APIView):
                         'path': '/api/packet/optimize-order',
                         'description': 'Returns optimized selection order indices used for PDF generation.',
                     },
+                    'song_packets': {
+                        'method': 'GET, POST',
+                        'path': '/api/song-packets',
+                        'description': 'List session-scoped packets or create a new packet with initial version.',
+                    },
+                    'song_packet_state': {
+                        'method': 'PATCH',
+                        'path': '/api/song-packets/{packet_id}/state',
+                        'description': 'Update current packet state and append edit-history event.',
+                    },
+                    'song_packet_save_version': {
+                        'method': 'POST',
+                        'path': '/api/song-packets/{packet_id}/save-version',
+                        'description': 'Create a new immutable packet version from current state.',
+                    },
                 },
             }
         )
+
+
+class SongPacketListCreateView(APIView):
+    def get(self, request):
+        packets = _packet_queryset_for_session(request)
+        return Response({'packets': SongPacketSerializer(packets, many=True).data})
+
+    def post(self, request):
+        serializer = SongPacketCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        session_key = _ensure_session_key(request)
+        title = serializer.validated_data['title'].strip()
+        initial_state = serializer.validated_data.get('initial_state', {}) or {}
+        packet = SongPacket.objects.create(
+            session_key=session_key,
+            title=title,
+            current_state=initial_state,
+        )
+        version = _create_packet_version(packet, initial_state, description='Initial version')
+        SongPacketEditEvent.objects.create(
+            packet=packet,
+            packet_version=version,
+            event_type='create_packet',
+            summary='Created packet',
+            change={'title': title, 'version_number': version.version_number},
+        )
+        return Response(_packet_payload(packet), status=status.HTTP_201_CREATED)
+
+
+class SongPacketDetailView(APIView):
+    def get(self, request, packet_id: int):
+        packet = _packet_for_session_or_404(request, packet_id)
+        return Response(_packet_payload(packet))
+
+
+class SongPacketOpenLatestView(APIView):
+    def post(self, request, packet_id: int):
+        packet = _packet_for_session_or_404(request, packet_id)
+        latest_version = packet.versions.order_by('-version_number').first()
+        if latest_version:
+            packet.current_version = latest_version
+            packet.current_state = latest_version.snapshot or {}
+            packet.save(update_fields=['current_version', 'current_state', 'updated_at'])
+            SongPacketEditEvent.objects.create(
+                packet=packet,
+                packet_version=latest_version,
+                event_type='open_latest',
+                summary='Opened latest version',
+                change={'version_number': latest_version.version_number},
+            )
+        return Response(_packet_payload(packet))
+
+
+class SongPacketStateView(APIView):
+    def patch(self, request, packet_id: int):
+        packet = _packet_for_session_or_404(request, packet_id)
+        serializer = SongPacketStateUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        packet.current_state = serializer.validated_data['state'] or {}
+        packet.save(update_fields=['current_state', 'updated_at'])
+
+        event_type = serializer.validated_data.get('event_type') or 'update'
+        summary = serializer.validated_data.get('summary', '')
+        change = serializer.validated_data.get('change', {})
+        SongPacketEditEvent.objects.create(
+            packet=packet,
+            packet_version=packet.current_version,
+            event_type=event_type,
+            summary=summary,
+            change=change,
+        )
+
+        return Response({'packet': SongPacketSerializer(packet).data, 'state': packet.current_state})
+
+
+class SongPacketSaveVersionView(APIView):
+    def post(self, request, packet_id: int):
+        packet = _packet_for_session_or_404(request, packet_id)
+        serializer = SongPacketSaveVersionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        description = serializer.validated_data.get('description', '')
+        version = _create_packet_version(packet, packet.current_state, description=description)
+        SongPacketEditEvent.objects.create(
+            packet=packet,
+            packet_version=version,
+            event_type='save_version',
+            summary=description or f'Saved version {version.version_number}',
+            change={'version_number': version.version_number},
+        )
+        return Response(
+            {
+                'packet': SongPacketSerializer(packet).data,
+                'version': SongPacketVersionMetaSerializer(version).data,
+                'versions': SongPacketVersionMetaSerializer(
+                    packet.versions.order_by('-version_number'),
+                    many=True,
+                ).data,
+            }
+        )
+
+
+class SongPacketVersionListView(APIView):
+    def get(self, request, packet_id: int):
+        packet = _packet_for_session_or_404(request, packet_id)
+        versions = packet.versions.order_by('-version_number')
+        return Response({'versions': SongPacketVersionMetaSerializer(versions, many=True).data})
+
+
+class SongPacketHistoryView(APIView):
+    def get(self, request, packet_id: int):
+        packet = _packet_for_session_or_404(request, packet_id)
+        events = packet.edit_events.order_by('-created_at')
+        return Response({'history': SongPacketEditEventSerializer(events, many=True).data})
+
+
+class SongPacketActivateVersionView(APIView):
+    def post(self, request, packet_id: int):
+        packet = _packet_for_session_or_404(request, packet_id)
+        serializer = SongPacketActivateVersionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        version = get_object_or_404(
+            SongPacketVersion,
+            id=serializer.validated_data['version_id'],
+            packet=packet,
+        )
+        packet.current_version = version
+        packet.current_state = version.snapshot or {}
+        packet.save(update_fields=['current_version', 'current_state', 'updated_at'])
+        SongPacketEditEvent.objects.create(
+            packet=packet,
+            packet_version=version,
+            event_type='activate_version',
+            summary=f'Activated version {version.version_number}',
+            change={'version_number': version.version_number},
+        )
+        return Response(_packet_payload(packet))
+
+
+class SongPacketVersionGenerateView(APIView):
+    def post(self, request, packet_id: int, version_id: int):
+        packet = _packet_for_session_or_404(request, packet_id)
+        version = get_object_or_404(SongPacketVersion, packet=packet, id=version_id)
+        snapshot = version.snapshot or {}
+        serializer = PacketRequestSerializer(
+            data={
+                'selections': snapshot.get('selections', []),
+                'maintain_original_order': snapshot.get('maintain_original_order', False),
+            }
+        )
+        serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+        selections = validated.get('selections', [])
+        songs = [_resolve_song_payload(item) for item in selections]
+        maintain_original_order = validated.get('maintain_original_order', False)
+        order = compute_packet_song_order(
+            songs=songs,
+            maintain_original_order=maintain_original_order,
+        )
+        pdf_bytes, metrics = render_song_packet_pdf(
+            songs,
+            maintain_original_order=maintain_original_order,
+            draw_order=order,
+            include_metrics=True,
+        )
+        version.page_count = metrics.get('pages')
+        version.song_spills = metrics.get('song_page_spill')
+        version.save(update_fields=['page_count', 'song_spills'])
+
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = (
+            f'attachment; filename=\"song-packet-{packet.id}-v{version.version_number}.pdf\"'
+        )
+        response['X-Packet-Pages'] = str(metrics.get('pages', 0))
+        response['X-Packet-Song-Spills'] = str(metrics.get('song_page_spill', 0))
+        return response
 
 
 class MatchSongsView(APIView):
