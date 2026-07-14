@@ -503,6 +503,47 @@ function App() {
     }
   };
 
+  const handleDeleteRow = async (rowIndex) => {
+    const removedRow = matches[rowIndex];
+    if (!removedRow) {
+      return;
+    }
+
+    const nextRows = matches.filter((_row, index) => index !== rowIndex);
+    const { finalRows, removedCount } = finalizeRefinedRows(nextRows);
+
+    setDuplicateRemovedCount(removedCount);
+    setMatches(finalRows);
+    setManualOrderCards([]);
+    setPacketStats(null);
+    setActiveReviewRowIndex((previousIndex) => {
+      if (!finalRows.length) {
+        return 0;
+      }
+      if (previousIndex > rowIndex) {
+        return previousIndex - 1;
+      }
+      return Math.min(previousIndex, finalRows.length - 1);
+    });
+
+    const snapshot = buildPacketStateSnapshot({
+      matchesValue: finalRows,
+      manualCardsValue: [],
+      packetStatsValue: null,
+      stepValue: 1,
+      duplicateRemovedCountValue: removedCount,
+    });
+    await persistPacketState(snapshot, {
+      eventType: 'delete_song',
+      summary: 'Deleted song from refinement',
+      change: {
+        row_index: rowIndex,
+        input: removedRow.input,
+        selected_song_id: removedRow.selectedSongId || null,
+      },
+    });
+  };
+
   const handleResetChordpro = async (rowIndex) => {
     const copy = [...matches];
     copy[rowIndex] = {
@@ -888,6 +929,7 @@ function App() {
             matches={matches}
             onSelectionChange={handleSelectionChange}
             onSearchCandidates={handleCandidateSearch}
+            onDeleteRow={handleDeleteRow}
             onResetChordpro={handleResetChordpro}
             activeRowIndex={activeReviewRowIndex}
             setActiveRowIndex={setActiveReviewRowIndex}

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -10,10 +10,134 @@ import {
   Typography,
 } from '@mui/material';
 
+const SongSearchBox = memo(function SongSearchBox({
+  initialValue,
+  rowIndex,
+  onSearchCandidates,
+  setActiveRowIndex,
+}) {
+  const [searchTerm, setSearchTerm] = useState(initialValue);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    setSearchTerm(initialValue);
+  }, [initialValue]);
+
+  const handleSearch = async () => {
+    const query = searchTerm.trim();
+    if (!query || isSearching) {
+      return;
+    }
+
+    setActiveRowIndex(rowIndex);
+    setIsSearching(true);
+    try {
+      await onSearchCandidates(rowIndex, query);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr auto' }, gap: 1 }}>
+      <TextField
+        label="Search Songbase"
+        value={searchTerm}
+        placeholder="Search by title or lyric fragment"
+        InputProps={{ sx: { '& input': { py: 0.55, fontSize: '0.95rem' } } }}
+        onFocus={() => setActiveRowIndex(rowIndex)}
+        onChange={(event) => setSearchTerm(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            handleSearch();
+          }
+        }}
+      />
+      <Button
+        variant="outlined"
+        disabled={!searchTerm.trim() || isSearching}
+        onClick={handleSearch}
+        sx={{ minWidth: 96 }}
+      >
+        {isSearching ? 'Searching…' : 'Search'}
+      </Button>
+    </Box>
+  );
+});
+
+const SongBodyEditor = memo(function SongBodyEditor({
+  value,
+  rowIndex,
+  isExpanded,
+  onSelectionChange,
+  setActiveRowIndex,
+}) {
+  const normalizedValue = value || '';
+  const [draft, setDraft] = useState(normalizedValue);
+  const lastCommittedRef = useRef(normalizedValue);
+  const commitTimerRef = useRef(null);
+
+  useEffect(() => {
+    setDraft(normalizedValue);
+    lastCommittedRef.current = normalizedValue;
+  }, [normalizedValue]);
+
+  useEffect(() => (
+    () => {
+      if (commitTimerRef.current) {
+        clearTimeout(commitTimerRef.current);
+      }
+    }
+  ), []);
+
+  const commitDraft = (nextValue = draft) => {
+    if (commitTimerRef.current) {
+      clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = null;
+    }
+    if (nextValue === lastCommittedRef.current) {
+      return;
+    }
+
+    lastCommittedRef.current = nextValue;
+    onSelectionChange(rowIndex, {
+      chordproOverride: nextValue,
+    });
+  };
+
+  const scheduleCommit = (nextValue) => {
+    if (commitTimerRef.current) {
+      clearTimeout(commitTimerRef.current);
+    }
+    commitTimerRef.current = setTimeout(() => {
+      commitDraft(nextValue);
+    }, 800);
+  };
+
+  return (
+    <TextField
+      multiline
+      minRows={10}
+      maxRows={isExpanded ? undefined : 10}
+      placeholder="Edit chord/lyric body..."
+      value={draft}
+      onFocus={() => setActiveRowIndex(rowIndex)}
+      onBlur={() => commitDraft()}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        setDraft(nextValue);
+        scheduleCommit(nextValue);
+      }}
+    />
+  );
+});
+
 function ReviewStep({
   matches,
   onSelectionChange,
   onSearchCandidates,
+  onDeleteRow,
   onResetChordpro,
   activeRowIndex,
   setActiveRowIndex,
@@ -23,8 +147,6 @@ function ReviewStep({
   const hasRows = matches.length > 0;
   const rowRefs = useRef({});
   const [expandedEditors, setExpandedEditors] = useState({});
-  const [searchTerms, setSearchTerms] = useState({});
-  const [searchingRows, setSearchingRows] = useState({});
 
   const labelForRow = (row) => {
     const chosen = row.candidates?.find((candidate) => candidate.song_id === row.selectedSongId);
@@ -43,23 +165,8 @@ function ReviewStep({
   };
 
   const searchTermForRow = (row, rowIndex) => (
-    searchTerms[rowIndex] ?? row.searchQuery ?? row.input ?? ''
+    row.searchQuery ?? row.input ?? ''
   );
-
-  const handleSearch = async (row, rowIndex) => {
-    const query = searchTermForRow(row, rowIndex).trim();
-    if (!query || searchingRows[rowIndex]) {
-      return;
-    }
-
-    setActiveRowIndex(rowIndex);
-    setSearchingRows((prev) => ({ ...prev, [rowIndex]: true }));
-    try {
-      await onSearchCandidates(rowIndex, query);
-    } finally {
-      setSearchingRows((prev) => ({ ...prev, [rowIndex]: false }));
-    }
-  };
 
   return (
     <Box
@@ -150,32 +257,12 @@ function ReviewStep({
                       </Box>
                     )}
                   </Box>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr auto' }, gap: 1 }}>
-                    <TextField
-                      label="Search Songbase"
-                      value={searchTermForRow(row, rowIndex)}
-                      placeholder="Search by title or lyric fragment"
-                      InputProps={{ sx: { '& input': { py: 0.55, fontSize: '0.95rem' } } }}
-                      onFocus={() => setActiveRowIndex(rowIndex)}
-                      onChange={(event) =>
-                        setSearchTerms((prev) => ({ ...prev, [rowIndex]: event.target.value }))
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault();
-                          handleSearch(row, rowIndex);
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outlined"
-                      disabled={!searchTermForRow(row, rowIndex).trim() || searchingRows[rowIndex]}
-                      onClick={() => handleSearch(row, rowIndex)}
-                      sx={{ minWidth: 96 }}
-                    >
-                      {searchingRows[rowIndex] ? 'Searching…' : 'Search'}
-                    </Button>
-                  </Box>
+                  <SongSearchBox
+                    initialValue={searchTermForRow(row, rowIndex)}
+                    rowIndex={rowIndex}
+                    onSearchCandidates={onSearchCandidates}
+                    setActiveRowIndex={setActiveRowIndex}
+                  />
 
                   <TextField
                     select
@@ -259,7 +346,7 @@ function ReviewStep({
                     />
                   </Box>
 
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
                     <Typography
                       component="button"
                       type="button"
@@ -274,6 +361,18 @@ function ReviewStep({
                     >
                       Reset to default
                     </Typography>
+                    <Button
+                      variant="text"
+                      color="error"
+                      size="small"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDeleteRow(rowIndex);
+                      }}
+                      sx={{ minWidth: 'auto' }}
+                    >
+                      Delete card
+                    </Button>
                   </Box>
 
                   <Button
@@ -285,18 +384,12 @@ function ReviewStep({
                     {expandedEditors[rowIndex] ? '▲ Collapse editor' : '▼ Expand editor'}
                   </Button>
 
-                  <TextField
-                    multiline
-                    minRows={10}
-                    maxRows={expandedEditors[rowIndex] ? undefined : 10}
-                    placeholder="Edit chord/lyric body..."
+                  <SongBodyEditor
                     value={row.chordproOverride || ''}
-                    onFocus={() => setActiveRowIndex(rowIndex)}
-                    onChange={(event) =>
-                      onSelectionChange(rowIndex, {
-                        chordproOverride: event.target.value,
-                      })
-                    }
+                    rowIndex={rowIndex}
+                    isExpanded={Boolean(expandedEditors[rowIndex])}
+                    onSelectionChange={onSelectionChange}
+                    setActiveRowIndex={setActiveRowIndex}
                   />
                 </Stack>
               </Box>
