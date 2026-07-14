@@ -10,6 +10,8 @@ LYRIC_FONT = 'Helvetica'
 CHORD_FONT = 'Helvetica-Bold'
 TEXT_FONT_SIZE = 11
 SONG_TITLE_FONT_SIZE = 15
+LEFT_MARGIN = 72   # 1.0in
+RIGHT_MARGIN = 36  # 0.5in
 
 
 @dataclass
@@ -813,12 +815,13 @@ def compute_packet_song_order(
     pdf = canvas.Canvas(buffer, pagesize=LETTER)
 
     page_width, page_height = LETTER
-    h_margin = 18
+    left_margin = LEFT_MARGIN
+    right_margin = RIGHT_MARGIN
     v_margin = 72
     line_height = 14
     center_x = page_width / 2.0
-    left_column_width = center_x - h_margin
-    right_column_width = page_width - h_margin - center_x
+    left_column_width = center_x - left_margin
+    right_column_width = page_width - right_margin - center_x
     column_width = min(left_column_width, right_column_width)
     top = page_height - v_margin
     bottom = v_margin
@@ -856,12 +859,13 @@ def compute_packet_order_and_metrics(
     pdf = canvas.Canvas(buffer, pagesize=LETTER)
 
     page_width, page_height = LETTER
-    h_margin = 18
+    left_margin = LEFT_MARGIN
+    right_margin = RIGHT_MARGIN
     v_margin = 72
     line_height = 14
     center_x = page_width / 2.0
-    left_column_width = center_x - h_margin
-    right_column_width = page_width - h_margin - center_x
+    left_column_width = center_x - left_margin
+    right_column_width = page_width - right_margin - center_x
     column_width = min(left_column_width, right_column_width)
     top = page_height - v_margin
     bottom = v_margin
@@ -896,13 +900,14 @@ def render_song_packet_pdf(
     pdf = canvas.Canvas(buffer, pagesize=LETTER)
 
     page_width, page_height = LETTER
-    h_margin = 18
+    left_margin = LEFT_MARGIN
+    right_margin = RIGHT_MARGIN
     v_margin = 72
     gutter = 0
     line_height = 14
     center_x = page_width / 2.0
-    left_column_width = center_x - h_margin
-    right_column_width = page_width - h_margin - center_x
+    left_column_width = center_x - left_margin
+    right_column_width = page_width - right_margin - center_x
     column_width = min(left_column_width, right_column_width)
     top = page_height - v_margin
     bottom = v_margin
@@ -933,8 +938,9 @@ def render_song_packet_pdf(
         )
         index_top = page_height - v_margin
         index_bottom = v_margin
-        col_width = page_width - h_margin * 2
-        x_position = h_margin
+        index_right_margin = 72  # 1.0in for index page
+        col_width = page_width - left_margin - index_right_margin
+        x_position = left_margin
         y = index_top
 
         # Keep index on exactly one page:
@@ -991,7 +997,7 @@ def render_song_packet_pdf(
         entry_line_spacing = chosen_font + chosen_spacing
 
         pdf.setFont(*index_heading_font)
-        pdf.drawString(h_margin, y, 'Song Index')
+        pdf.drawString(left_margin, y, 'Song Index')
         y -= line_height * 2.0
         pdf.setFont(*entry_font)
 
@@ -1051,7 +1057,7 @@ def render_song_packet_pdf(
         rendered_pages: set[int] = set()
 
         def x_for_col(col: int) -> float:
-            return h_margin if col == 0 else center_x
+            return left_margin if col == 0 else center_x
 
         if song.force_new_page and (cursor.col != 0 or cursor.y < top):
             cursor = _Cursor(page=cursor.page + 1, col=0, y=top)

@@ -102,6 +102,7 @@ function App() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveDescription, setSaveDescription] = useState('');
   const [packetMenuAnchor, setPacketMenuAnchor] = useState(null);
+  const [hasUnsavedEditorChanges, setHasUnsavedEditorChanges] = useState(false);
 
   const versionsCacheRef = useRef({});
 
@@ -184,6 +185,7 @@ function App() {
     setSelectedPacketId(payload.packet.id);
     setPacketVersions(payload.versions || []);
     setPacketHistory(payload.edit_history || []);
+    setHasUnsavedEditorChanges(false);
     if (shouldHydrateState) {
       hydrateFromPacketState(payload.state || {});
     }
@@ -196,6 +198,7 @@ function App() {
     manualCardsValue = manualOrderCards,
     packetStatsValue = packetStats,
     stepValue = step,
+    duplicateRemovedCountValue = duplicateRemovedCount,
   } = {}) => {
     const baseSelections = toSelections(matchesValue);
     const orderedSelections = manualCardsValue.length
@@ -224,7 +227,7 @@ function App() {
       manual_order_cards: manualCardsValue,
       packet_stats: packetStatsValue,
       step: stepValue,
-      duplicate_removed_count: duplicateRemovedCount,
+      duplicate_removed_count: duplicateRemovedCountValue,
       selections: orderedSelections,
     };
   };
@@ -301,6 +304,7 @@ function App() {
         manualCardsValue: [],
         packetStatsValue: null,
         stepValue: 1,
+        duplicateRemovedCountValue: removedCount,
       });
       const saved = await updateSongPacketState(created.packet.id, snapshot, {
         eventType: 'match_songs',
@@ -354,6 +358,38 @@ function App() {
     }
   };
 
+  const buildResolvedMatchRow = async (previousRow, matchResult) => {
+    const candidates = matchResult.candidates || [];
+    const selectedSongId = matchResult.selected?.song_id || candidates[0]?.song_id || '';
+    const versions = selectedSongId ? await fetchVersionsCached(selectedSongId) : [];
+    const selectedCandidate = candidates.find((candidate) => candidate.song_id === selectedSongId);
+    const selectedTitle = matchResult.selected?.title || selectedCandidate?.title;
+
+    return {
+      ...previousRow,
+      ...matchResult,
+      input: previousRow.input,
+      searchQuery: matchResult.input || previousRow.input,
+      candidates,
+      selectedSongId,
+      versions,
+      selectedVersionId: versions?.[0]?.id || '',
+      capo: versions?.[0]?.capo_default || 0,
+      defaultCapo: versions?.[0]?.capo_default || 0,
+      chordproOverride: versions?.[0]?.lyrics_chordpro || '',
+      defaultChordpro: versions?.[0]?.lyrics_chordpro || '',
+      titleOverride: selectedTitle || previousRow.titleOverride || previousRow.input || '',
+    };
+  };
+
+  const finalizeRefinedRows = (rows) => {
+    if (!allRowsMatched(rows)) {
+      return { finalRows: rows, removedCount: 0 };
+    }
+    const dedupeResult = removeDuplicateMatches(rows);
+    return { finalRows: dedupeResult.deduped, removedCount: dedupeResult.removedCount };
+  };
+
   const handleSelectionChange = async (rowIndex, patch) => {
     const copy = [...matches];
     copy[rowIndex] = { ...copy[rowIndex], ...patch };
@@ -383,19 +419,23 @@ function App() {
       }
     }
 
-    let finalRows = copy;
-    let removedCount = duplicateRemovedCount;
-    if (allRowsMatched(copy)) {
-      const dedupeResult = removeDuplicateMatches(copy);
-      finalRows = dedupeResult.deduped;
-      removedCount = dedupeResult.removedCount;
-    }
+    const { finalRows, removedCount } = finalizeRefinedRows(copy);
     setDuplicateRemovedCount(removedCount);
     setMatches(finalRows);
     setManualOrderCards([]);
     setPacketStats(null);
+    const patchFields = Object.keys(patch);
+    const editorOnlyChange =
+      patchFields.length === 1 && patchFields[0] === 'chordproOverride';
+    if (editorOnlyChange) {
+      setHasUnsavedEditorChanges(true);
+    }
     if (activeReviewRowIndex >= finalRows.length) {
       setActiveReviewRowIndex(Math.max(0, finalRows.length - 1));
+    }
+
+    if (editorOnlyChange) {
+      return;
     }
 
     const snapshot = buildPacketStateSnapshot({
@@ -403,12 +443,64 @@ function App() {
       manualCardsValue: [],
       packetStatsValue: null,
       stepValue: 1,
+      duplicateRemovedCountValue: removedCount,
     });
     await persistPacketState(snapshot, {
       eventType: 'edit_song',
       summary: 'Updated song refinement',
       change: { row_index: rowIndex, fields: Object.keys(patch) },
     });
+  };
+
+  const handleCandidateSearch = async (rowIndex, query) => {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      return;
+    }
+
+    setError('');
+    try {
+      const data = await matchSongs('', [trimmedQuery]);
+      const matchResult = data.results?.[0] || {
+        input: trimmedQuery,
+        selected: null,
+        candidates: [],
+      };
+      const copy = [...matches];
+      if (!copy[rowIndex]) {
+        return;
+      }
+
+      copy[rowIndex] = await buildResolvedMatchRow(copy[rowIndex], matchResult);
+      const { finalRows, removedCount } = finalizeRefinedRows(copy);
+      setDuplicateRemovedCount(removedCount);
+      setMatches(finalRows);
+      setManualOrderCards([]);
+      setPacketStats(null);
+      if (activeReviewRowIndex >= finalRows.length) {
+        setActiveReviewRowIndex(Math.max(0, finalRows.length - 1));
+      }
+
+      const snapshot = buildPacketStateSnapshot({
+        matchesValue: finalRows,
+        manualCardsValue: [],
+        packetStatsValue: null,
+        stepValue: 1,
+        duplicateRemovedCountValue: removedCount,
+      });
+      await persistPacketState(snapshot, {
+        eventType: 'search_song',
+        summary: 'Searched for replacement song',
+        change: {
+          row_index: rowIndex,
+          query: trimmedQuery,
+          candidate_count: matchResult.candidates?.length || 0,
+          selected_song_id: copy[rowIndex].selectedSongId || null,
+        },
+      });
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Song search failed.');
+    }
   };
 
   const handleResetChordpro = async (rowIndex) => {
@@ -589,6 +681,12 @@ function App() {
     setLoading(true);
     setError('');
     try {
+      const snapshot = buildPacketStateSnapshot();
+      await updateSongPacketState(activePacket.id, snapshot, {
+        eventType: 'manual_save',
+        summary: 'Saved packet state before versioning',
+        change: { unsaved_editor_changes: hasUnsavedEditorChanges },
+      });
       const result = await saveSongPacketVersion(activePacket.id, saveDescription);
       if (result?.packet) {
         setActivePacket(result.packet);
@@ -597,6 +695,7 @@ function App() {
         setPacketVersions(result.versions);
       }
       pushLocalHistoryEvent('save_version', saveDescription || 'Saved new version');
+      setHasUnsavedEditorChanges(false);
       setSaveDialogOpen(false);
       setSaveDescription('');
       await loadPacketList();
@@ -724,6 +823,14 @@ function App() {
         >
           Save Version
         </Button>
+        {hasUnsavedEditorChanges ? (
+          <Chip
+            size="small"
+            color="warning"
+            label="Editor changes not yet saved"
+            sx={{ ml: 0.5 }}
+          />
+        ) : null}
 
         {activePacket ? (
           <Box sx={{ ml: 'auto' }}>
@@ -780,6 +887,7 @@ function App() {
           <ReviewStep
             matches={matches}
             onSelectionChange={handleSelectionChange}
+            onSearchCandidates={handleCandidateSearch}
             onResetChordpro={handleResetChordpro}
             activeRowIndex={activeReviewRowIndex}
             setActiveRowIndex={setActiveReviewRowIndex}

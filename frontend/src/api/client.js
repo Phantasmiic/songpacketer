@@ -5,8 +5,11 @@ const api = axios.create({
   withCredentials: true,
 });
 
-export async function matchSongs(inputText) {
-  const response = await api.post('/songs/match', { input_text: inputText });
+export async function matchSongs(inputText, queries = []) {
+  const response = await api.post('/songs/match', {
+    input_text: inputText,
+    queries,
+  });
   return response.data;
 }
 

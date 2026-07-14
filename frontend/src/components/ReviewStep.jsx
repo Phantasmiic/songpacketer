@@ -13,6 +13,7 @@ import {
 function ReviewStep({
   matches,
   onSelectionChange,
+  onSearchCandidates,
   onResetChordpro,
   activeRowIndex,
   setActiveRowIndex,
@@ -22,6 +23,8 @@ function ReviewStep({
   const hasRows = matches.length > 0;
   const rowRefs = useRef({});
   const [expandedEditors, setExpandedEditors] = useState({});
+  const [searchTerms, setSearchTerms] = useState({});
+  const [searchingRows, setSearchingRows] = useState({});
 
   const labelForRow = (row) => {
     const chosen = row.candidates?.find((candidate) => candidate.song_id === row.selectedSongId);
@@ -37,6 +40,25 @@ function ReviewStep({
 
   const toggleExpandedEditor = (rowIndex) => {
     setExpandedEditors((prev) => ({ ...prev, [rowIndex]: !prev[rowIndex] }));
+  };
+
+  const searchTermForRow = (row, rowIndex) => (
+    searchTerms[rowIndex] ?? row.searchQuery ?? row.input ?? ''
+  );
+
+  const handleSearch = async (row, rowIndex) => {
+    const query = searchTermForRow(row, rowIndex).trim();
+    if (!query || searchingRows[rowIndex]) {
+      return;
+    }
+
+    setActiveRowIndex(rowIndex);
+    setSearchingRows((prev) => ({ ...prev, [rowIndex]: true }));
+    try {
+      await onSearchCandidates(rowIndex, query);
+    } finally {
+      setSearchingRows((prev) => ({ ...prev, [rowIndex]: false }));
+    }
   };
 
   return (
@@ -128,6 +150,33 @@ function ReviewStep({
                       </Box>
                     )}
                   </Box>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr auto' }, gap: 1 }}>
+                    <TextField
+                      label="Search Songbase"
+                      value={searchTermForRow(row, rowIndex)}
+                      placeholder="Search by title or lyric fragment"
+                      InputProps={{ sx: { '& input': { py: 0.55, fontSize: '0.95rem' } } }}
+                      onFocus={() => setActiveRowIndex(rowIndex)}
+                      onChange={(event) =>
+                        setSearchTerms((prev) => ({ ...prev, [rowIndex]: event.target.value }))
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          handleSearch(row, rowIndex);
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="outlined"
+                      disabled={!searchTermForRow(row, rowIndex).trim() || searchingRows[rowIndex]}
+                      onClick={() => handleSearch(row, rowIndex)}
+                      sx={{ minWidth: 96 }}
+                    >
+                      {searchingRows[rowIndex] ? 'Searching…' : 'Search'}
+                    </Button>
+                  </Box>
+
                   <TextField
                     select
                     label="Matched Song"
@@ -146,12 +195,12 @@ function ReviewStep({
                       })
                     }
                   >
-                    {row.candidates.length === 0 && (
+                    {(row.candidates || []).length === 0 && (
                       <MenuItem disabled value="">
-                        No candidates found
+                        No candidates found. Try a different search above.
                       </MenuItem>
                     )}
-                    {row.candidates.map((candidate) => (
+                    {(row.candidates || []).map((candidate) => (
                       <MenuItem key={candidate.song_id} value={candidate.song_id} sx={{ py: 0.4, minHeight: 32, fontSize: '0.95rem' }}>
                         {candidate.title} ({Math.round(candidate.score * 100)}%)
                       </MenuItem>
