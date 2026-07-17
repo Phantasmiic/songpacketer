@@ -50,7 +50,7 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
   };
 
   return (
-    <Box sx={{ display: 'flex', height: '100%' }}>
+    <Box sx={{ display: 'flex', height: '100%', position: 'relative', zIndex: 50 }}>
       {/* Grabber Bar */}
       <Box
         onMouseDown={handleMouseDown}
@@ -64,7 +64,7 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
           transition: 'background-color 0.2s',
           marginRight: '4px',
           marginLeft: '4px',
-          zIndex: 10,
+          zIndex: 50,
           '&:hover': {
             bgcolor: 'rgba(0,0,0,0.05)',
             borderRadius: '8px',
