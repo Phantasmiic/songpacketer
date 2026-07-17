@@ -339,7 +339,7 @@ function App() {
       }
       pushLocalHistoryEvent(event?.eventType, event?.summary, event?.change || {});
     } catch (err) {
-      setError(err.response?.data?.detail || 'Packet autosave failed.');
+      setError(err.message || 'Packet autosave failed.');
     }
   };
 
@@ -418,7 +418,7 @@ function App() {
       });
       await loadPacketList();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Matching failed.');
+      setError(err.message || 'Matching failed.');
     } finally {
       setLoading(false);
     }
@@ -437,7 +437,7 @@ function App() {
       setToast('Loaded latest packet version.');
       await loadPacketList();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to open packet.');
+      setError(err.message || 'Failed to open packet.');
     } finally {
       setLoading(false);
     }
@@ -450,7 +450,7 @@ function App() {
       const result = await syncSongbase();
       setToast(`Sync complete. Created: ${result.created}, Updated: ${result.updated}`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Song sync failed.');
+      setError(err.message || err.message || 'Song sync failed.');
     } finally {
       setLoading(false);
     }
@@ -597,7 +597,7 @@ function App() {
         },
       });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Song search failed.');
+      setError(err.message || 'Song search failed.');
     }
   };
 
@@ -694,7 +694,7 @@ function App() {
         change: { title: title.trim(), added_songs: newMatchesCount },
       });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to add section and match songs.');
+      setError(err.message || 'Failed to add section and match songs.');
     } finally {
       setLoading(false);
     }
@@ -776,7 +776,7 @@ function App() {
 
       setToast('PDF generated. Optimized order saved for manual adjustment.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'PDF generation failed.');
+      setError(err.message || 'PDF generation failed.');
     } finally {
       setLoading(false);
     }
@@ -901,7 +901,7 @@ function App() {
 
       setToast('PDF regenerated from manual order.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'PDF generation failed.');
+      setError(err.message || 'PDF generation failed.');
     } finally {
       setLoading(false);
     }
@@ -934,7 +934,7 @@ function App() {
       await loadPacketList();
       setToast('Saved new packet version.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Saving version failed.');
+      setError(err.message || 'Saving version failed.');
     } finally {
       setLoading(false);
     }
@@ -952,7 +952,7 @@ function App() {
       setPacketMenuAnchor(null);
       setToast('Switched packet version.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Version switch failed.');
+      setError(err.message || 'Version switch failed.');
     } finally {
       setLoading(false);
     }
@@ -981,7 +981,7 @@ function App() {
       setPacketStats(result.stats);
       setToast('Generated PDF from selected version.');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Version PDF generation failed.');
+      setError(err.message || 'Version PDF generation failed.');
     } finally {
       setLoading(false);
     }
