@@ -376,8 +376,8 @@ function App() {
             selectedVersionId: versions?.[0]?.id || '',
             capo: versions?.[0]?.capo_default || 0,
             defaultCapo: versions?.[0]?.capo_default || 0,
-            chordproOverride: versions?.[0]?.lyrics_chordpro || '',
-            defaultChordpro: versions?.[0]?.lyrics_chordpro || '',
+            chordproOverride: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
+            defaultChordpro: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
             titleOverride: row.selected?.title || row.candidates?.[0]?.title || row.input || '',
           };
         })
@@ -475,8 +475,8 @@ function App() {
       selectedVersionId: versions?.[0]?.id || '',
       capo: versions?.[0]?.capo_default || 0,
       defaultCapo: versions?.[0]?.capo_default || 0,
-      chordproOverride: versions?.[0]?.lyrics_chordpro || '',
-      defaultChordpro: versions?.[0]?.lyrics_chordpro || '',
+      chordproOverride: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
+      defaultChordpro: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
       titleOverride: selectedTitle || previousRow.titleOverride || previousRow.input || '',
     };
   };
@@ -502,8 +502,8 @@ function App() {
       copy[rowIndex].selectedVersionId = versions?.[0]?.id || '';
       copy[rowIndex].capo = versions?.[0]?.capo_default || 0;
       copy[rowIndex].defaultCapo = versions?.[0]?.capo_default || 0;
-      copy[rowIndex].chordproOverride = versions?.[0]?.lyrics_chordpro || '';
-      copy[rowIndex].defaultChordpro = versions?.[0]?.lyrics_chordpro || '';
+      copy[rowIndex].chordproOverride = versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '';
+      copy[rowIndex].defaultChordpro = versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '';
       copy[rowIndex].titleOverride =
         selectedCandidate?.title || copy[rowIndex].titleOverride || copy[rowIndex].input;
     } else if (patch.selectedVersionId && copy[rowIndex].versions?.length) {
@@ -513,8 +513,8 @@ function App() {
       if (chosen) {
         copy[rowIndex].capo = chosen.capo_default || 0;
         copy[rowIndex].defaultCapo = chosen.capo_default || 0;
-        copy[rowIndex].chordproOverride = chosen.lyrics_chordpro || '';
-        copy[rowIndex].defaultChordpro = chosen.lyrics_chordpro || '';
+        copy[rowIndex].chordproOverride = chosen.lyrics_chordpro || chosen.chordpro_text || '';
+        copy[rowIndex].defaultChordpro = chosen.lyrics_chordpro || chosen.chordpro_text || '';
       }
     }
 
@@ -665,8 +665,8 @@ function App() {
               selectedVersionId: versions?.[0]?.id || '',
               capo: versions?.[0]?.capo_default || 0,
               defaultCapo: versions?.[0]?.capo_default || 0,
-              chordproOverride: versions?.[0]?.lyrics_chordpro || '',
-              defaultChordpro: versions?.[0]?.lyrics_chordpro || '',
+              chordproOverride: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
+              defaultChordpro: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
               titleOverride: row.selected?.title || row.candidates?.[0]?.title || row.input || '',
             };
           })
