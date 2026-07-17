@@ -3,15 +3,15 @@ import { Box } from '@mui/material';
 
 export default function ResizableSidebar({ children, initialWidth = 500, minWidth = 300, maxWidth = 800 }) {
   const [width, setWidth] = useState(initialWidth);
-  const isResizing = useRef(false);
+  const dragState = useRef({ isResizing: false, startX: 0, startWidth: 0 });
 
   useEffect(() => {
     const handleMouseMove = (e) => {
-      if (!isResizing.current) return;
+      if (!dragState.current.isResizing) return;
       
-      // Calculate width from the right side of the screen
-      // This assumes the sidebar is on the far right.
-      const newWidth = window.innerWidth - e.clientX;
+      const deltaX = e.clientX - dragState.current.startX;
+      // Since sidebar is on the right, moving mouse left (negative deltaX) increases width
+      const newWidth = dragState.current.startWidth - deltaX;
       
       // Add constraints
       const constrainedWidth = Math.max(minWidth, Math.min(newWidth, maxWidth, window.innerWidth - 400));
@@ -19,8 +19,8 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
     };
 
     const handleMouseUp = () => {
-      if (isResizing.current) {
-        isResizing.current = false;
+      if (dragState.current.isResizing) {
+        dragState.current.isResizing = false;
         document.body.style.cursor = 'default';
         document.body.style.userSelect = 'auto'; // Re-enable text selection
       }
@@ -37,7 +37,11 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
 
   const handleMouseDown = (e) => {
     e.preventDefault();
-    isResizing.current = true;
+    dragState.current = {
+      isResizing: true,
+      startX: e.clientX,
+      startWidth: width,
+    };
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none'; // Prevent text selection while dragging
   };
@@ -48,17 +52,19 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
       <Box
         onMouseDown={handleMouseDown}
         sx={{
-          width: '12px',
+          width: '16px',
           cursor: 'col-resize',
           bgcolor: 'transparent',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'background-color 0.2s',
-          marginLeft: '-12px',
+          marginRight: '8px',
+          marginLeft: '16px',
           zIndex: 10,
           '&:hover': {
             bgcolor: 'rgba(0,0,0,0.05)',
+            borderRadius: '8px',
           },
           '&::after': {
             content: '""',
@@ -71,7 +77,7 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
         }}
       />
       {/* Sidebar Content */}
-      <Box sx={{ width, flexShrink: 0, pl: 2 }}>
+      <Box sx={{ width, flexShrink: 0 }}>
         {children}
       </Box>
     </Box>
