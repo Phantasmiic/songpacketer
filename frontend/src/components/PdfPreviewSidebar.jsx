@@ -1,4 +1,5 @@
-import { Box, CircularProgress, Typography, Paper } from '@mui/material';
+import { Box, CircularProgress, Typography, Paper, IconButton, Tooltip } from '@mui/material';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 function PdfPreviewSidebar({ previewUrl, isGenerating }) {
   return (
@@ -14,8 +15,19 @@ function PdfPreviewSidebar({ previewUrl, isGenerating }) {
         overflow: 'hidden',
       }}
     >
-      <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', bgcolor: '#f5f5f5' }}>
+      <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', bgcolor: '#f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h6">Live Preview</Typography>
+        {previewUrl && (
+          <Tooltip title="View Larger in New Tab">
+            <IconButton 
+              size="small" 
+              onClick={() => window.open(previewUrl, '_blank')}
+              sx={{ color: 'text.secondary' }}
+            >
+              <OpenInNewIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
       <Box sx={{ flexGrow: 1, position: 'relative', bgcolor: '#e0e0e0' }}>
         {isGenerating && (

@@ -24,6 +24,7 @@ import InputStep from './components/InputStep';
 import ReviewStep from './components/ReviewStep';
 import GenerateStep from './components/GenerateStep';
 import PdfPreviewSidebar from './components/PdfPreviewSidebar';
+import ResizableSidebar from './components/ResizableSidebar';
 import {
   activateSongPacketVersion,
   createSongPacket,
@@ -1099,8 +1100,8 @@ function App() {
         </Alert>
       ) : null}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 440px', xl: '1fr 600px' }, gap: 3 }}>
-        <Box sx={{ minWidth: 0, mb: 2 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: { xs: 3, lg: 0 } }}>
+        <Box sx={{ minWidth: 0, flexGrow: 1, mb: 2 }}>
         {step === 0 && (
           <InputStep
             mode={packetMode}
@@ -1154,8 +1155,10 @@ function App() {
           />
         )}
         </Box>
-        <Box sx={{ minWidth: 0, display: { xs: 'none', lg: 'block' } }}>
-          <PdfPreviewSidebar previewUrl={previewPdfUrl} isGenerating={isGeneratingPreview} />
+        <Box sx={{ display: { xs: 'none', lg: 'block' } }}>
+          <ResizableSidebar initialWidth={500} minWidth={350} maxWidth={1000}>
+            <PdfPreviewSidebar previewUrl={previewPdfUrl} isGenerating={isGeneratingPreview} />
+          </ResizableSidebar>
         </Box>
       </Box>
 
