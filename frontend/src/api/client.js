@@ -18,31 +18,22 @@ export async function fetchVersions(songId) {
   return response.data;
 }
 
+import { renderSongPacketPdf } from '../pdf/engine';
+
 export async function generatePacketPdf(
   selections,
   maintainOriginalOrder = false,
   showSectionHeadersInBody = false,
   showSectionHeadersInIndex = true
 ) {
-  const response = await api.post(
-    '/packet/generate',
-    {
-      selections,
-      maintain_original_order: maintainOriginalOrder,
-      show_section_headers_in_body: showSectionHeadersInBody,
-      show_section_headers_in_index: showSectionHeadersInIndex,
-    },
-    { responseType: 'blob' }
+  return await renderSongPacketPdf(
+    selections,
+    maintainOriginalOrder,
+    showSectionHeadersInBody,
+    showSectionHeadersInIndex
   );
-  const pages = Number(response.headers['x-packet-pages']);
-  const songSpills = Number(response.headers['x-packet-song-spills']);
-  return {
-    blob: response.data,
-    stats: Number.isFinite(pages) && Number.isFinite(songSpills)
-      ? { pages, songSpills }
-      : null,
-  };
 }
+
 
 export async function optimizePacketOrder(
   selections,

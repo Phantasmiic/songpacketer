@@ -41,7 +41,7 @@ import {
 
 const steps = ['Input', 'Refine', 'Generate'];
 
-function toSelections(rows) {
+function toSelections(rows, versionsCacheRef = null) {
   return rows
     .filter((row) => row.type === 'section' || row.selectedSongId)
     .map((row) => {
@@ -52,6 +52,16 @@ function toSelections(rows) {
           force_new_page: false,
         };
       }
+      let chordpro_text = '';
+      if (versionsCacheRef && versionsCacheRef.current[row.selectedSongId]) {
+        const versions = versionsCacheRef.current[row.selectedSongId];
+        const selected = row.selectedVersionId 
+          ? versions.find(v => v.id === row.selectedVersionId)
+          : versions[0];
+        if (selected) {
+          chordpro_text = selected.chordpro_text;
+        }
+      }
       return {
         type: 'song',
         input_text: row.input,
@@ -60,6 +70,7 @@ function toSelections(rows) {
         capo: row.capo === '' || row.capo == null ? 0 : row.capo,
         chordpro_override: row.chordproOverride || '',
         title_override: row.titleOverride || '',
+        chordpro_text: chordpro_text,
       };
     });
 }
@@ -133,6 +144,19 @@ function App() {
 
   const versionsCacheRef = useRef({});
 
+  const handleUpdatePacketState = async (eventType, summary, change) => {
+    try {
+      await updateSongPacketState(selectedPacketId, {
+        state: { matches, manualOrderCards },
+        event_type: eventType,
+        summary: summary,
+        change: change,
+      });
+    } catch (err) {
+      console.error('Failed to update state on backend:', err);
+    }
+  };
+
   const loadPacketList = async () => {
     try {
       const data = await listSongPackets();
@@ -166,26 +190,10 @@ function App() {
     previewTimerRef.current = setTimeout(async () => {
       setIsGeneratingPreview(true);
       try {
-        const baseSelections = toSelections(matches);
-        let orderedSelections = baseSelections;
-        if (manualOrderCards.length > 0) {
-          orderedSelections = manualOrderCards.map((card) => ({
-            ...baseSelections[card.selectionIndex],
-            force_new_page: card.forceNewPage,
-          }));
-        } else if (!maintainOriginalOrder) {
-          const optimized = await optimizePacketOrder(baseSelections, maintainOriginalOrder);
-          const order = Array.isArray(optimized.order) ? optimized.order : baseSelections.map((_, index) => index);
-          orderedSelections = order.map(index => {
-            return {
-              ...baseSelections[index],
-              force_new_page: false
-            };
-          });
-        }
+        const payload = toSelections(manualOrderCards.length > 0 ? manualOrderCards : matches, versionsCacheRef);
         
         const result = await generatePacketPdf(
-          orderedSelections,
+          payload,
           maintainOriginalOrder,
           showSectionHeadersInBody,
           showSectionHeadersInIndex
