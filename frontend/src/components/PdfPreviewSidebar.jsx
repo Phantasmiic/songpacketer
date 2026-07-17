@@ -21,7 +21,7 @@ function PdfPreviewSidebar({ previewUrl, isGenerating }) {
           <Tooltip title="View Larger in New Tab">
             <IconButton 
               size="small" 
-              onClick={() => window.open(previewUrl, '_blank')}
+              onClick={() => window.open(`${previewUrl}#view=FitH`, '_blank')}
               sx={{ color: 'text.secondary' }}
             >
               <OpenInNewIcon fontSize="small" />
@@ -54,7 +54,7 @@ function PdfPreviewSidebar({ previewUrl, isGenerating }) {
         )}
         {previewUrl ? (
           <iframe
-            src={previewUrl}
+            src={`${previewUrl}#view=FitH`}
             title="PDF Preview"
             style={{ width: '100%', height: '100%', border: 'none' }}
           />
