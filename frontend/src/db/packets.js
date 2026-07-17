@@ -35,9 +35,12 @@ export async function createSongPacket(title, initialState = {}) {
   const id = await db.add('packets', packet);
   
   return {
-    id,
-    title,
-    current_state: initialState,
+    packet: {
+      id,
+      title,
+      current_state: initialState,
+    },
+    state: initialState,
     versions: [],
     edit_history: packet.history,
   };
