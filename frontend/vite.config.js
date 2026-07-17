@@ -8,4 +8,13 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/setupTests.js',
   },
+  server: {
+    proxy: {
+      '/api/songbase': {
+        target: 'https://songbase.life',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/songbase/, '/api/v2'),
+      },
+    },
+  },
 });

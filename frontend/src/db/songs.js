@@ -153,7 +153,7 @@ export async function syncSongbase() {
         id: `${songId}-0`,
         tune_name: tuneName,
         capo_default: fallbackCapo,
-        chordpro_text: lyrics,
+        lyrics_chordpro: lyrics,
       });
     } else {
       tunes.forEach((tune) => {
@@ -162,7 +162,7 @@ export async function syncSongbase() {
           id: `${songId}-${tune.index}`,
           tune_name: tuneName,
           capo_default: tune.capo_default !== undefined ? tune.capo_default : fallbackCapo,
-          chordpro_text: tune.body_chordpro || '',
+          lyrics_chordpro: tune.body_chordpro || '',
         });
       });
     }
