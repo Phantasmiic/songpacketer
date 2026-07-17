@@ -62,7 +62,7 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'background-color 0.2s',
-          marginRight: '8px',
+          marginRight: '16px',
           marginLeft: '16px',
           zIndex: 10,
           '&:hover': {
