@@ -13,6 +13,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 const SongSearchBox = memo(function SongSearchBox({
   initialValue,
@@ -122,8 +124,7 @@ const SongBodyEditor = memo(function SongBodyEditor({
   return (
     <TextField
       multiline
-      minRows={10}
-      maxRows={isExpanded ? undefined : 10}
+      minRows={15}
       placeholder="Edit chord/lyric body..."
       value={draft}
       onFocus={() => setActiveRowIndex(rowIndex)}
@@ -490,51 +491,76 @@ function ReviewStep({
                           />
                         </Box>
 
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
-                          <Typography
-                            component="button"
-                            type="button"
-                            onClick={() => onResetChordpro(rowIndex)}
-                            style={{
-                              border: 'none',
-                              background: 'transparent',
-                              color: '#0d47a1',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                            }}
-                          >
-                            Reset to default
-                          </Typography>
-                          <Button
-                            variant="text"
-                            color="error"
-                            size="small"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onDeleteRow(rowIndex);
-                            }}
-                            sx={{ minWidth: 'auto' }}
-                          >
-                            Delete card
-                          </Button>
+                        <Box sx={{ borderTop: '1px solid #eee', pt: 1.5, mt: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Button
+                              variant="text"
+                              size="small"
+                              onClick={() => toggleExpandedEditor(rowIndex)}
+                              sx={{ 
+                                color: 'text.secondary', 
+                                p: 0, 
+                                minWidth: 'auto',
+                                textTransform: 'none',
+                                fontWeight: 500,
+                                '&:hover': { background: 'transparent', color: 'primary.main' } 
+                              }}
+                              startIcon={expandedEditors[rowIndex] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                            >
+                              Edit chords and lyrics
+                            </Button>
+                            
+                            <Box sx={{ display: 'flex', gap: 2 }}>
+                              {expandedEditors[rowIndex] && (
+                                <Typography
+                                  component="button"
+                                  type="button"
+                                  onClick={() => onResetChordpro(rowIndex)}
+                                  sx={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: 'primary.main',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem',
+                                    p: 0,
+                                    '&:hover': { textDecoration: 'underline' }
+                                  }}
+                                >
+                                  Reset
+                                </Typography>
+                              )}
+                              <Typography
+                                component="button"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onDeleteRow(rowIndex);
+                                }}
+                                sx={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: 'error.main',
+                                  cursor: 'pointer',
+                                  fontSize: '0.875rem',
+                                  p: 0,
+                                  '&:hover': { textDecoration: 'underline' }
+                                }}
+                              >
+                                Delete
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          {expandedEditors[rowIndex] && (
+                            <SongBodyEditor
+                              value={row.chordproOverride || ''}
+                              rowIndex={rowIndex}
+                              isExpanded={true}
+                              onSelectionChange={onSelectionChange}
+                              setActiveRowIndex={setActiveRowIndex}
+                            />
+                          )}
                         </Box>
-
-                        <Button
-                          variant="text"
-                          size="small"
-                          onClick={() => toggleExpandedEditor(rowIndex)}
-                          sx={{ alignSelf: 'flex-start', p: 0, minWidth: 'auto' }}
-                        >
-                          {expandedEditors[rowIndex] ? '▲ Collapse editor' : '▼ Expand editor'}
-                        </Button>
-
-                        <SongBodyEditor
-                          value={row.chordproOverride || ''}
-                          rowIndex={rowIndex}
-                          isExpanded={Boolean(expandedEditors[rowIndex])}
-                          onSelectionChange={onSelectionChange}
-                          setActiveRowIndex={setActiveRowIndex}
-                        />
                       </>
                     )}
                   </Stack>
