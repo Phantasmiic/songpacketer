@@ -5,7 +5,7 @@
 ## How it works
 - **Songs**: Fetch the catalog from songbase.life once and cache it in the browser (`IndexedDB`).
 - **Saves**: Save your active song packets locally in the browser (`localStorage`).
-- **PDFs**: Rewrite the Python PDF generator (`pdf.py`) in JavaScript (using `@react-pdf/renderer` or `pdfmake`) so PDFs generate right in the browser.
+- **PDFs**: Rewrite the Python PDF generator (`pdf.py`) in JavaScript (using `pdf-lib` for pixel-perfect low-level layout control) so PDFs generate right in the browser.
 
 ## Why do this?
 - **Free hosting forever** as a static site on Vercel.
