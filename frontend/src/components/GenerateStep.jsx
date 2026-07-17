@@ -16,6 +16,10 @@ import { useState } from 'react';
 function GenerateStep({
   maintainOriginalOrder,
   setMaintainOriginalOrder,
+  showSectionHeadersInBody,
+  setShowSectionHeadersInBody,
+  showSectionHeadersInIndex,
+  setShowSectionHeadersInIndex,
   error,
   manualOrderCards,
   onMoveManualCard,
@@ -43,15 +47,35 @@ function GenerateStep({
 
           {error && <Alert severity="error">{error}</Alert>}
 
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={maintainOriginalOrder}
-                onChange={(event) => setMaintainOriginalOrder(event.target.checked)}
-              />
-            }
-            label="Maintain original order"
-          />
+          <Stack direction="row" spacing={3} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={maintainOriginalOrder}
+                  onChange={(event) => setMaintainOriginalOrder(event.target.checked)}
+                />
+              }
+              label="Maintain original order"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showSectionHeadersInIndex}
+                  onChange={(event) => setShowSectionHeadersInIndex(event.target.checked)}
+                />
+              }
+              label="Show section headers in index"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showSectionHeadersInBody}
+                  onChange={(event) => setShowSectionHeadersInBody(event.target.checked)}
+                />
+              }
+              label="Show section headers in PDF body"
+            />
+          </Stack>
 
           {packetStats && (
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>

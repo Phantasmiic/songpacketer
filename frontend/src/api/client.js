@@ -18,10 +18,20 @@ export async function fetchVersions(songId) {
   return response.data;
 }
 
-export async function generatePacketPdf(selections, maintainOriginalOrder = false) {
+export async function generatePacketPdf(
+  selections,
+  maintainOriginalOrder = false,
+  showSectionHeadersInBody = false,
+  showSectionHeadersInIndex = true
+) {
   const response = await api.post(
     '/packet/generate',
-    { selections, maintain_original_order: maintainOriginalOrder },
+    {
+      selections,
+      maintain_original_order: maintainOriginalOrder,
+      show_section_headers_in_body: showSectionHeadersInBody,
+      show_section_headers_in_index: showSectionHeadersInIndex,
+    },
     { responseType: 'blob' }
   );
   const pages = Number(response.headers['x-packet-pages']);
@@ -34,10 +44,17 @@ export async function generatePacketPdf(selections, maintainOriginalOrder = fals
   };
 }
 
-export async function optimizePacketOrder(selections, maintainOriginalOrder = false) {
+export async function optimizePacketOrder(
+  selections,
+  maintainOriginalOrder = false,
+  showSectionHeadersInBody = false,
+  showSectionHeadersInIndex = true
+) {
   const response = await api.post('/packet/optimize-order', {
     selections,
     maintain_original_order: maintainOriginalOrder,
+    show_section_headers_in_body: showSectionHeadersInBody,
+    show_section_headers_in_index: showSectionHeadersInIndex,
   });
   return response.data;
 }

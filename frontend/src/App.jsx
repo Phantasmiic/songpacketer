@@ -23,6 +23,7 @@ import {
 import InputStep from './components/InputStep';
 import ReviewStep from './components/ReviewStep';
 import GenerateStep from './components/GenerateStep';
+import PdfPreviewSidebar from './components/PdfPreviewSidebar';
 import {
   activateSongPacketVersion,
   createSongPacket,
@@ -42,19 +43,29 @@ const steps = ['Input', 'Refine', 'Generate'];
 
 function toSelections(rows) {
   return rows
-    .filter((row) => row.selectedSongId)
-    .map((row) => ({
-      input_text: row.input,
-      song_id: row.selectedSongId,
-      version_id: row.selectedVersionId || null,
-      capo: row.capo === '' || row.capo == null ? 0 : row.capo,
-      chordpro_override: row.chordproOverride || '',
-      title_override: row.titleOverride || '',
-    }));
+    .filter((row) => row.type === 'section' || row.selectedSongId)
+    .map((row) => {
+      if (row.type === 'section') {
+        return {
+          type: 'section',
+          title: row.title,
+          force_new_page: false,
+        };
+      }
+      return {
+        type: 'song',
+        input_text: row.input,
+        song_id: row.selectedSongId,
+        version_id: row.selectedVersionId || null,
+        capo: row.capo === '' || row.capo == null ? 0 : row.capo,
+        chordpro_override: row.chordproOverride || '',
+        title_override: row.titleOverride || '',
+      };
+    });
 }
 
 function allRowsMatched(rows) {
-  return rows.length > 0 && rows.every((row) => Boolean(row.selectedSongId));
+  return rows.length > 0 && rows.filter(r => r.type !== 'section').every((row) => Boolean(row.selectedSongId));
 }
 
 function removeDuplicateMatches(rows) {
@@ -63,6 +74,10 @@ function removeDuplicateMatches(rows) {
   const deduped = [];
 
   rows.forEach((row) => {
+    if (row.type === 'section') {
+      deduped.push(row);
+      return;
+    }
     if (!row.selectedSongId) {
       deduped.push(row);
       return;
@@ -90,6 +105,8 @@ function App() {
   const [duplicateRemovedCount, setDuplicateRemovedCount] = useState(0);
   const [manualOrderCards, setManualOrderCards] = useState([]);
   const [packetStats, setPacketStats] = useState(null);
+  const [showSectionHeadersInBody, setShowSectionHeadersInBody] = useState(false);
+  const [showSectionHeadersInIndex, setShowSectionHeadersInIndex] = useState(true);
 
   const [packetMode, setPacketMode] = useState('new');
   const [packetTitle, setPacketTitle] = useState('');
@@ -103,6 +120,16 @@ function App() {
   const [saveDescription, setSaveDescription] = useState('');
   const [packetMenuAnchor, setPacketMenuAnchor] = useState(null);
   const [hasUnsavedEditorChanges, setHasUnsavedEditorChanges] = useState(false);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const previewTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+      if (previewPdfUrl) window.URL.revokeObjectURL(previewPdfUrl);
+    };
+  }, [previewPdfUrl]);
 
   const versionsCacheRef = useRef({});
 
@@ -122,6 +149,61 @@ function App() {
   useEffect(() => {
     loadPacketList();
   }, []);
+
+  useEffect(() => {
+    const songRows = matches.filter(r => r.type !== 'section');
+    const unmatchedCount = songRows.filter((row) => !row.selectedSongId).length;
+    const canProceed = songRows.length > 0 && unmatchedCount === 0;
+    
+    if (step === 0 || !canProceed) {
+      return;
+    }
+
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+    }
+
+    previewTimerRef.current = setTimeout(async () => {
+      setIsGeneratingPreview(true);
+      try {
+        const baseSelections = toSelections(matches);
+        let orderedSelections = baseSelections;
+        if (manualOrderCards.length > 0) {
+          orderedSelections = manualOrderCards.map((card) => ({
+            ...baseSelections[card.selectionIndex],
+            force_new_page: card.forceNewPage,
+          }));
+        } else if (!maintainOriginalOrder) {
+          const optimized = await optimizePacketOrder(baseSelections, maintainOriginalOrder);
+          const order = Array.isArray(optimized.order) ? optimized.order : baseSelections.map((_, index) => index);
+          orderedSelections = order.map(index => {
+            return {
+              ...baseSelections[index],
+              force_new_page: false
+            };
+          });
+        }
+        
+        const result = await generatePacketPdf(
+          orderedSelections,
+          maintainOriginalOrder,
+          showSectionHeadersInBody,
+          showSectionHeadersInIndex
+        );
+        const blob = result.blob;
+        const newUrl = window.URL.createObjectURL(blob);
+        setPreviewPdfUrl(oldUrl => {
+          if (oldUrl) window.URL.revokeObjectURL(oldUrl);
+          return newUrl;
+        });
+      } catch (err) {
+        console.error('Failed to generate preview PDF', err);
+      } finally {
+        setIsGeneratingPreview(false);
+      }
+    }, 1000);
+
+  }, [matches, manualOrderCards, maintainOriginalOrder, step]);
 
   const primeVersionsCache = (rows) => {
     rows.forEach((row) => {
@@ -164,6 +246,8 @@ function App() {
     setMatches(nextMatches);
     primeVersionsCache(nextMatches);
     setMaintainOriginalOrder(Boolean(nextState.maintain_original_order));
+    setShowSectionHeadersInBody(nextState.show_section_headers_in_body ?? false);
+    setShowSectionHeadersInIndex(nextState.show_section_headers_in_index ?? true);
     setManualOrderCards(Array.isArray(nextState.manual_order_cards) ? nextState.manual_order_cards : []);
     setPacketStats(nextState.packet_stats || null);
     const nextStep = Number.isInteger(nextState.step)
@@ -195,6 +279,8 @@ function App() {
     inputTextValue = inputText,
     matchesValue = matches,
     maintainOrderValue = maintainOriginalOrder,
+    showSectionHeadersInBodyValue = showSectionHeadersInBody,
+    showSectionHeadersInIndexValue = showSectionHeadersInIndex,
     manualCardsValue = manualOrderCards,
     packetStatsValue = packetStats,
     stepValue = step,
@@ -224,6 +310,8 @@ function App() {
       input_text: inputTextValue,
       matches: matchesValue,
       maintain_original_order: maintainOrderValue,
+      show_section_headers_in_body: showSectionHeadersInBodyValue,
+      show_section_headers_in_index: showSectionHeadersInIndexValue,
       manual_order_cards: manualCardsValue,
       packet_stats: packetStatsValue,
       step: stepValue,
@@ -256,6 +344,8 @@ function App() {
         input_text: inputText,
         matches: [],
         maintain_original_order: false,
+        show_section_headers_in_body: false,
+        show_section_headers_in_index: true,
         manual_order_cards: [],
         packet_stats: null,
         step: 0,
@@ -544,6 +634,64 @@ function App() {
     });
   };
 
+  const handleAddSection = async (title, pastedText) => {
+    if (!title.trim() && !pastedText.trim()) return;
+    setLoading(true);
+    try {
+      const sectionRow = { type: 'section', title: title.trim(), input: title.trim(), id: `sec-${Date.now()}` };
+      let nextRows = title.trim() ? [sectionRow] : [];
+      let newMatchesCount = 0;
+
+      if (pastedText.trim()) {
+        const data = await matchSongs(pastedText);
+        const newSongs = await Promise.all(
+          data.results.map(async (row) => {
+            const selectedSongId = row.selected?.song_id || row.candidates?.[0]?.song_id;
+            const versions = selectedSongId ? await fetchVersionsCached(selectedSongId) : [];
+            return {
+              ...row,
+              type: 'song',
+              selectedSongId,
+              versions,
+              selectedVersionId: versions?.[0]?.id || '',
+              capo: versions?.[0]?.capo_default || 0,
+              defaultCapo: versions?.[0]?.capo_default || 0,
+              chordproOverride: versions?.[0]?.lyrics_chordpro || '',
+              defaultChordpro: versions?.[0]?.lyrics_chordpro || '',
+              titleOverride: row.selected?.title || row.candidates?.[0]?.title || row.input || '',
+            };
+          })
+        );
+        nextRows = [...nextRows, ...newSongs];
+        newMatchesCount = newSongs.length;
+      }
+      
+      const copy = [...matches, ...nextRows];
+      const { finalRows, removedCount } = finalizeRefinedRows(copy);
+      setDuplicateRemovedCount(removedCount);
+      setMatches(finalRows);
+      setManualOrderCards([]);
+      setPacketStats(null);
+
+      const snapshot = buildPacketStateSnapshot({
+        matchesValue: finalRows,
+        manualCardsValue: [],
+        packetStatsValue: null,
+        stepValue: 1,
+        duplicateRemovedCountValue: removedCount,
+      });
+      await persistPacketState(snapshot, {
+        eventType: 'add_section',
+        summary: 'Added section and pasted songs',
+        change: { title: title.trim(), added_songs: newMatchesCount },
+      });
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to add section and match songs.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleResetChordpro = async (rowIndex) => {
     const copy = [...matches];
     copy[rowIndex] = {
@@ -590,7 +738,12 @@ function App() {
         ...baseSelections[card.selectionIndex],
         force_new_page: card.forceNewPage,
       }));
-      const result = await generatePacketPdf(orderedSelections, true);
+      const result = await generatePacketPdf(
+        orderedSelections,
+        maintainOriginalOrder,
+        showSectionHeadersInBody,
+        showSectionHeadersInIndex
+      );
       const blob = result.blob;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -631,6 +784,32 @@ function App() {
       eventType: 'toggle_maintain_order',
       summary: checked ? 'Enabled maintain original order' : 'Disabled maintain original order',
       change: { maintain_original_order: checked },
+    });
+  };
+
+  const handleShowSectionHeadersInBodyChange = (checked) => {
+    setShowSectionHeadersInBody(checked);
+    const snapshot = buildPacketStateSnapshot({
+      showSectionHeadersInBodyValue: checked,
+      stepValue: 2,
+    });
+    persistPacketState(snapshot, {
+      eventType: 'toggle_show_section_headers_in_body',
+      summary: checked ? 'Enabled section headers in PDF body' : 'Disabled section headers in PDF body',
+      change: { show_section_headers_in_body: checked },
+    });
+  };
+
+  const handleShowSectionHeadersInIndexChange = (checked) => {
+    setShowSectionHeadersInIndex(checked);
+    const snapshot = buildPacketStateSnapshot({
+      showSectionHeadersInIndexValue: checked,
+      stepValue: 2,
+    });
+    persistPacketState(snapshot, {
+      eventType: 'toggle_show_section_headers_in_index',
+      summary: checked ? 'Enabled section headers in index' : 'Disabled section headers in index',
+      change: { show_section_headers_in_index: checked },
     });
   };
 
@@ -684,7 +863,12 @@ function App() {
         ...baseSelections[card.selectionIndex],
         force_new_page: card.forceNewPage,
       }));
-      const result = await generatePacketPdf(orderedSelections, true);
+      const result = await generatePacketPdf(
+        orderedSelections,
+        maintainOriginalOrder,
+        showSectionHeadersInBody,
+        showSectionHeadersInIndex
+      );
       const blob = result.blob;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -800,7 +984,7 @@ function App() {
   const activeVersionNumber = activePacket?.current_version?.version_number || activePacket?.latest_version_number || 1;
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <Container maxWidth={false} sx={{ py: 4, maxWidth: 1600 }}>
       <Typography variant="h4" sx={{ mb: 2, fontWeight: 600 }}>
         Song Packet Generator
       </Typography>
@@ -907,7 +1091,8 @@ function App() {
         </Alert>
       ) : null}
 
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 440px', xl: '1fr 600px' }, gap: 3 }}>
+        <Box sx={{ minWidth: 0, mb: 2 }}>
         {step === 0 && (
           <InputStep
             mode={packetMode}
@@ -931,6 +1116,7 @@ function App() {
             onSearchCandidates={handleCandidateSearch}
             onDeleteRow={handleDeleteRow}
             onResetChordpro={handleResetChordpro}
+            onAddSection={handleAddSection}
             activeRowIndex={activeReviewRowIndex}
             setActiveRowIndex={setActiveReviewRowIndex}
             unmatchedCount={unmatchedCount}
@@ -941,6 +1127,10 @@ function App() {
           <GenerateStep
             maintainOriginalOrder={maintainOriginalOrder}
             setMaintainOriginalOrder={handleMaintainOriginalOrderChange}
+            showSectionHeadersInBody={showSectionHeadersInBody}
+            setShowSectionHeadersInBody={handleShowSectionHeadersInBodyChange}
+            showSectionHeadersInIndex={showSectionHeadersInIndex}
+            setShowSectionHeadersInIndex={handleShowSectionHeadersInIndexChange}
             error={error}
             manualOrderCards={manualOrderCards}
             onMoveManualCard={handleMoveManualCard}
@@ -955,6 +1145,10 @@ function App() {
             packetHistory={packetHistory}
           />
         )}
+        </Box>
+        <Box sx={{ minWidth: 0, display: { xs: 'none', lg: 'block' } }}>
+          <PdfPreviewSidebar previewUrl={previewPdfUrl} isGenerating={isGeneratingPreview} />
+        </Box>
       </Box>
 
       <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} fullWidth maxWidth="sm">

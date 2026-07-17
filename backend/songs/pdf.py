@@ -21,6 +21,7 @@ class RenderedSong:
     capo: int
     lines: list[tuple[str, str]]
     force_new_page: bool = False
+    is_section: bool = False
 
 
 def chordpro_to_lines(chordpro_text: str) -> list[tuple[str, str]]:
@@ -468,7 +469,30 @@ def _prepare_song_layout(
     column_width: float,
     base_font_size: float,
     base_line_height: float,
+    show_section_headers_in_body: bool = False,
 ) -> _PreparedSongLayout:
+    if getattr(song, 'is_section', False):
+        if not show_section_headers_in_body:
+            return _PreparedSongLayout(
+                rows=[],
+                blocks=[],
+                block_heights=[],
+                line_height=base_line_height,
+                total_height=0.0,
+                font_size=base_font_size,
+                force_new_page=song.force_new_page,
+            )
+        # If showing headers, just render the title as a single block
+        title_row = _Row(content=song.title, is_chord=False)
+        return _PreparedSongLayout(
+            rows=[title_row],
+            blocks=[[title_row]],
+            block_heights=[[_row_height(title_row, base_line_height)]],
+            line_height=base_line_height,
+            total_height=_row_height(title_row, base_line_height) + base_line_height,
+            font_size=SONG_TITLE_FONT_SIZE,
+            force_new_page=song.force_new_page,
+        )
     base_rows = _wrapped_song_rows(pdf, song, column_width, base_font_size)
     needs_wrap = len(base_rows) > len(_song_rows(song))
     font_size = max(1.0, base_font_size - 1.0) if needs_wrap else float(base_font_size)
@@ -894,6 +918,8 @@ def render_song_packet_pdf(
     maintain_original_order: bool = False,
     draw_order: list[int] | None = None,
     include_metrics: bool = False,
+    show_section_headers_in_body: bool = False,
+    show_section_headers_in_index: bool = True,
 ) -> bytes | tuple[bytes, dict]:
     songs_list = list(songs)
     buffer = BytesIO()
@@ -915,7 +941,7 @@ def render_song_packet_pdf(
 
     prepared_layouts = {
         song_index: _prepare_song_layout(
-            pdf, song, column_width, TEXT_FONT_SIZE, line_height
+            pdf, song, column_width, TEXT_FONT_SIZE, line_height, show_section_headers_in_body
         )
         for song_index, song in enumerate(songs_list)
     }
@@ -932,10 +958,14 @@ def render_song_packet_pdf(
     song_number_map = {song_index: number for number, song_index in enumerate(draw_order, start=1)}
 
     def draw_song_index_pages() -> None:
-        entries = sorted(
-            [(songs_list[idx].title, song_number_map[idx]) for idx in draw_order],
-            key=lambda item: item[0].lower(),
-        )
+        entries = []
+        for idx in draw_order:
+            song = songs_list[idx]
+            if getattr(song, "is_section", False) and not show_section_headers_in_index:
+                continue
+            num = song_number_map.get(idx)
+            entries.append((song.title, num, getattr(song, "is_section", False)))
+        entries.sort(key=lambda item: item[0].lower())
         index_top = page_height - v_margin
         index_bottom = v_margin
         index_right_margin = 72  # 1.0in for index page
@@ -1025,7 +1055,19 @@ def render_song_packet_pdf(
 
             pdf.drawString(right_x, y_pos, right_label)
 
-        for title, number in entries:
+        for title, number, is_section in entries:
+            if is_section:
+                y -= line_height * 0.5
+                if y < index_bottom:
+                    pdf.showPage()
+                    y = index_top
+                    pdf.setFont(CHORD_FONT, chosen_font)
+                else:
+                    pdf.setFont(CHORD_FONT, chosen_font)
+                pdf.drawString(x_position, y, title)
+                pdf.setFont(*entry_font)
+                y -= line_height
+                continue
             draw_index_line(title, number, x_position, y)
             y -= entry_line_spacing
 
@@ -1058,6 +1100,17 @@ def render_song_packet_pdf(
 
         def x_for_col(col: int) -> float:
             return left_margin if col == 0 else center_x
+
+        if getattr(song, 'is_section', False):
+            if not show_section_headers_in_body:
+                continue
+            pdf.setFont(CHORD_FONT, SONG_TITLE_FONT_SIZE)
+            cursor = _next_column(cursor, top) if cursor.y - bottom < song_height else cursor
+            pdf.setFont(CHORD_FONT, SONG_TITLE_FONT_SIZE)
+            pdf.drawString(x_for_col(cursor.col), cursor.y, f"{song_number}. {song.title}")
+            cursor = _Cursor(cursor.page, cursor.col, cursor.y - line_height)
+            pdf.setFont(LYRIC_FONT, song_font_size)
+            continue
 
         if song.force_new_page and (cursor.col != 0 or cursor.y < top):
             cursor = _Cursor(page=cursor.page + 1, col=0, y=top)

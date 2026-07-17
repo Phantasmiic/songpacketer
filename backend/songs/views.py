@@ -331,7 +331,11 @@ class SongPacketVersionGenerateView(APIView):
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
         selections = validated.get('selections', [])
-        songs = [_resolve_song_payload(item) for item in selections]
+        show_section_headers_in_body = validated.get('show_section_headers_in_body', False)
+        show_section_headers_in_index = validated.get('show_section_headers_in_index', True)
+        songs = []
+        for item in selections:
+            songs.append(_resolve_song_payload(item))
         maintain_original_order = validated.get('maintain_original_order', False)
         order = compute_packet_song_order(
             songs=songs,
@@ -342,6 +346,8 @@ class SongPacketVersionGenerateView(APIView):
             maintain_original_order=maintain_original_order,
             draw_order=order,
             include_metrics=True,
+            show_section_headers_in_body=show_section_headers_in_body,
+            show_section_headers_in_index=show_section_headers_in_index,
         )
         version.page_count = metrics.get('pages')
         version.song_spills = metrics.get('song_page_spill')
@@ -522,6 +528,16 @@ class SongbaseSourceSampleInspectView(APIView):
 
 
 def _resolve_song_payload(selection: dict) -> RenderedSong:
+    if selection.get('type') == 'section':
+        return RenderedSong(
+            title=selection.get('title') or selection.get('title_override') or 'Section',
+            key='',
+            capo=0,
+            lines=[],
+            force_new_page=selection.get('force_new_page', False),
+            is_section=True,
+        )
+
     song = get_object_or_404(Song, id=selection['song_id'])
     version_id = selection.get('version_id')
     capo_override = selection.get('capo')
@@ -561,8 +577,8 @@ class PacketPreviewView(APIView):
         started_at = time.perf_counter()
         serializer = PacketRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         selections = serializer.validated_data['selections']
+        show_section_headers_in_body = serializer.validated_data.get('show_section_headers_in_body', False)
         maintain_original_order = serializer.validated_data.get('maintain_original_order', False)
         _debug_event(
             f'packet.preview.start selections={len(selections)} '
@@ -591,6 +607,7 @@ class PacketPreviewView(APIView):
             usable_height=usable_height,
             top=top,
             bottom=vertical_margin,
+            show_section_headers_in_body=show_section_headers_in_body,
         )
         layout_ms = (time.perf_counter() - layout_started) * 1000
         total_ms = (time.perf_counter() - started_at) * 1000
@@ -630,6 +647,8 @@ class PacketGenerateView(APIView):
             maintain_original_order=maintain_original_order,
             draw_order=order,
             include_metrics=True,
+            show_section_headers_in_body=serializer.validated_data.get('show_section_headers_in_body', False),
+            show_section_headers_in_index=serializer.validated_data.get('show_section_headers_in_index', True),
         )
 
         response = HttpResponse(pdf_bytes, content_type='application/pdf')

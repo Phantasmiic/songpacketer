@@ -23,11 +23,14 @@ class PacketSelectionSerializer(serializers.Serializer):
     chordpro_override = serializers.CharField(required=False, allow_blank=True)
     title_override = serializers.CharField(required=False, allow_blank=True)
     force_new_page = serializers.BooleanField(required=False, default=False)
+    type = serializers.CharField(required=False, default='song')
 
 
 class PacketRequestSerializer(serializers.Serializer):
     selections = PacketSelectionSerializer(many=True)
     maintain_original_order = serializers.BooleanField(required=False, default=False)
+    show_section_headers_in_body = serializers.BooleanField(required=False, default=False)
+    show_section_headers_in_index = serializers.BooleanField(required=False, default=True)
 
 
 class SongPacketVersionMetaSerializer(serializers.ModelSerializer):

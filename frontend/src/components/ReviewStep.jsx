@@ -3,6 +3,10 @@ import {
   Alert,
   Box,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   MenuItem,
   Paper,
   Stack,
@@ -133,12 +137,58 @@ const SongBodyEditor = memo(function SongBodyEditor({
   );
 });
 
+function AddSectionModal({ open, onClose, onAddSection }) {
+  const [title, setTitle] = useState('');
+  const [pastedText, setPastedText] = useState('');
+
+  const handleSubmit = () => {
+    onAddSection(title, pastedText);
+    setTitle('');
+    setPastedText('');
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Add Section</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Section Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Sunday Morning Worship"
+          />
+          <TextField
+            fullWidth
+            multiline
+            minRows={4}
+            label="Paste songs (optional)"
+            value={pastedText}
+            onChange={(e) => setPastedText(e.target.value)}
+            placeholder="Paste song titles here, one per line, to auto-assign them to this section."
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={!title.trim() && !pastedText.trim()}>
+          Add Section
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function ReviewStep({
   matches,
   onSelectionChange,
   onSearchCandidates,
   onDeleteRow,
   onResetChordpro,
+  onAddSection,
   activeRowIndex,
   setActiveRowIndex,
   unmatchedCount,
@@ -147,8 +197,11 @@ function ReviewStep({
   const hasRows = matches.length > 0;
   const rowRefs = useRef({});
   const [expandedEditors, setExpandedEditors] = useState({});
+  const [collapsedCards, setCollapsedCards] = useState({});
+  const [addSectionOpen, setAddSectionOpen] = useState(false);
 
   const labelForRow = (row) => {
+    if (row.type === 'section') return row.title;
     const chosen = row.candidates?.find((candidate) => candidate.song_id === row.selectedSongId);
     return chosen?.title || row.selected?.title || row.input;
   };
@@ -164,9 +217,17 @@ function ReviewStep({
     setExpandedEditors((prev) => ({ ...prev, [rowIndex]: !prev[rowIndex] }));
   };
 
+  const toggleCardCollapse = (rowIndex, e) => {
+    if (e) e.stopPropagation();
+    setCollapsedCards((prev) => ({ ...prev, [rowIndex]: !prev[rowIndex] }));
+  };
+
   const searchTermForRow = (row, rowIndex) => (
     row.searchQuery ?? row.input ?? ''
   );
+
+  let currentSection = null;
+  let songNumber = 1;
 
   return (
     <Box
@@ -178,7 +239,13 @@ function ReviewStep({
     >
       <Paper elevation={2} sx={{ p: 3 }}>
         <Stack spacing={2}>
-          <Typography variant="h6">Refine Matches</Typography>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Refine Matches</Typography>
+            <Button variant="outlined" size="small" onClick={() => setAddSectionOpen(true)}>
+              + Add Section
+            </Button>
+          </Stack>
+          
           {!hasRows && <Alert severity="info">No matches yet. Go back and run matching first.</Alert>}
           {unmatchedCount > 0 && (
             <Alert severity="warning">
@@ -192,208 +259,288 @@ function ReviewStep({
           )}
 
           {hasRows &&
-            matches.map((row, rowIndex) => (
-              <Box
-                key={`${row.input}-${rowIndex}`}
-                ref={(element) => {
-                  rowRefs.current[rowIndex] = element;
-                }}
-                sx={{
-                  border: '1px solid #e0e0e0',
-                  borderRadius: 2,
-                  p: 2,
-                  outline: activeRowIndex === rowIndex ? '2px solid #0d47a1' : 'none',
-                }}
-                onClick={() => setActiveRowIndex(rowIndex)}
-              >
-                <Stack spacing={1.8}>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    <Box
-                      sx={{
-                        display: 'inline-flex',
-                        alignSelf: 'flex-start',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: 99,
-                        bgcolor: '#eceff1',
-                        color: '#263238',
-                        fontWeight: 700,
-                        fontSize: '0.8rem',
-                      }}
-                    >
-                      Song {rowIndex + 1}
-                    </Box>
-                    <Box
-                      sx={{
-                        display: 'inline-flex',
-                        alignSelf: 'flex-start',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: 99,
-                        bgcolor: '#f3f4f6',
-                        color: '#374151',
-                        fontWeight: 700,
-                        fontSize: '0.8rem',
-                        maxWidth: '100%',
-                      }}
-                    >
-                      Input: {row.input}
-                    </Box>
-                    {!row.selectedSongId && (
-                      <Box
-                        sx={{
-                          display: 'inline-flex',
-                          alignSelf: 'flex-start',
-                          px: 1.5,
-                          py: 0.5,
-                          borderRadius: 99,
-                          bgcolor: '#ffebee',
-                          color: '#b71c1c',
-                          fontWeight: 700,
-                          fontSize: '0.8rem',
-                        }}
-                      >
-                        No Match
-                      </Box>
-                    )}
-                  </Box>
-                  <SongSearchBox
-                    initialValue={searchTermForRow(row, rowIndex)}
-                    rowIndex={rowIndex}
-                    onSearchCandidates={onSearchCandidates}
-                    setActiveRowIndex={setActiveRowIndex}
-                  />
-
-                  <TextField
-                    select
-                    label="Matched Song"
-                    value={row.selectedSongId || ''}
-                    error={!row.selectedSongId}
-                    InputLabelProps={{ shrink: true }}
-                    SelectProps={{
-                      MenuProps: { PaperProps: { sx: { maxHeight: 280 } } },
-                      sx: { '& .MuiSelect-select': { py: 0.55, fontSize: '0.95rem' } },
+            matches.map((row, rowIndex) => {
+              if (row.type === 'section') {
+                currentSection = row.id || `sec-${rowIndex}`;
+                return (
+                  <Box
+                    key={`sec-${rowIndex}`}
+                    ref={(element) => {
+                      rowRefs.current[rowIndex] = element;
                     }}
-                    onFocus={() => setActiveRowIndex(rowIndex)}
-                    onChange={(event) =>
-                      onSelectionChange(rowIndex, {
-                        selectedSongId: Number(event.target.value),
-                        selectedVersionId: '',
-                      })
-                    }
+                    sx={{
+                      border: '1px solid #c5cae9',
+                      backgroundColor: '#e8eaf6',
+                      borderRadius: 2,
+                      p: 2,
+                      outline: activeRowIndex === rowIndex ? '2px solid #3f51b5' : 'none',
+                      mt: 2,
+                    }}
+                    onClick={() => setActiveRowIndex(rowIndex)}
                   >
-                    {(row.candidates || []).length === 0 && (
-                      <MenuItem disabled value="">
-                        No candidates found. Try a different search above.
-                      </MenuItem>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <TextField
+                        variant="standard"
+                        value={row.title || ''}
+                        onChange={(e) => onSelectionChange(rowIndex, { title: e.target.value })}
+                        placeholder="Section Title"
+                        InputProps={{ disableUnderline: true, sx: { fontSize: '1.25rem', fontWeight: 600, color: '#1a237e' } }}
+                        fullWidth
+                      />
+                      <Button
+                        variant="text"
+                        color="error"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDeleteRow(rowIndex);
+                        }}
+                        sx={{ minWidth: 'auto', ml: 2 }}
+                      >
+                        Delete
+                      </Button>
+                    </Stack>
+                  </Box>
+                );
+              }
+
+              const isIndented = currentSection !== null;
+              const isCollapsed = collapsedCards[rowIndex];
+              const currentSongNumber = songNumber++;
+
+              return (
+                <Box
+                  key={`${row.input}-${rowIndex}`}
+                  ref={(element) => {
+                    rowRefs.current[rowIndex] = element;
+                  }}
+                  sx={{
+                    border: '1px solid #e0e0e0',
+                    borderLeft: isIndented ? '4px solid #3f51b5' : '1px solid #e0e0e0',
+                    marginLeft: isIndented ? 3 : 0,
+                    borderRadius: 2,
+                    p: 2,
+                    outline: activeRowIndex === rowIndex ? '2px solid #0d47a1' : 'none',
+                    backgroundColor: '#fff'
+                  }}
+                  onClick={() => setActiveRowIndex(rowIndex)}
+                >
+                  <Stack spacing={1.8}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignSelf: 'flex-start',
+                            px: 1.5,
+                            py: 0.5,
+                            borderRadius: 99,
+                            bgcolor: '#eceff1',
+                            color: '#263238',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                          }}
+                        >
+                          Song {currentSongNumber}
+                        </Box>
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignSelf: 'flex-start',
+                            px: 1.5,
+                            py: 0.5,
+                            borderRadius: 99,
+                            bgcolor: '#f3f4f6',
+                            color: '#374151',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            maxWidth: '100%',
+                          }}
+                        >
+                          Input: {row.input}
+                        </Box>
+                        {!row.selectedSongId && (
+                          <Box
+                            sx={{
+                              display: 'inline-flex',
+                              alignSelf: 'flex-start',
+                              px: 1.5,
+                              py: 0.5,
+                              borderRadius: 99,
+                              bgcolor: '#ffebee',
+                              color: '#b71c1c',
+                              fontWeight: 700,
+                              fontSize: '0.8rem',
+                            }}
+                          >
+                            No Match
+                          </Box>
+                        )}
+                        {row.selectedSongId && isCollapsed && (
+                          <Box
+                            sx={{
+                              display: 'inline-flex',
+                              alignSelf: 'flex-start',
+                              px: 1.5,
+                              py: 0.5,
+                              borderRadius: 99,
+                              bgcolor: '#e8f5e9',
+                              color: '#1b5e20',
+                              fontWeight: 700,
+                              fontSize: '0.8rem',
+                            }}
+                          >
+                            Matched
+                          </Box>
+                        )}
+                      </Box>
+                      <Button variant="text" size="small" onClick={(e) => toggleCardCollapse(rowIndex, e)}>
+                        {isCollapsed ? 'Expand' : 'Collapse'}
+                      </Button>
+                    </Box>
+
+                    {!isCollapsed && (
+                      <>
+                        <SongSearchBox
+                          initialValue={searchTermForRow(row, rowIndex)}
+                          rowIndex={rowIndex}
+                          onSearchCandidates={onSearchCandidates}
+                          setActiveRowIndex={setActiveRowIndex}
+                        />
+
+                        <TextField
+                          select
+                          label="Matched Song"
+                          value={row.selectedSongId || ''}
+                          error={!row.selectedSongId}
+                          InputLabelProps={{ shrink: true }}
+                          SelectProps={{
+                            MenuProps: { PaperProps: { sx: { maxHeight: 280 } } },
+                            sx: { '& .MuiSelect-select': { py: 0.55, fontSize: '0.95rem' } },
+                          }}
+                          onFocus={() => setActiveRowIndex(rowIndex)}
+                          onChange={(event) =>
+                            onSelectionChange(rowIndex, {
+                              selectedSongId: Number(event.target.value),
+                              selectedVersionId: '',
+                            })
+                          }
+                        >
+                          {(row.candidates || []).length === 0 && (
+                            <MenuItem disabled value="">
+                              No candidates found. Try a different search above.
+                            </MenuItem>
+                          )}
+                          {(row.candidates || []).map((candidate) => (
+                            <MenuItem key={candidate.song_id} value={candidate.song_id} sx={{ py: 0.4, minHeight: 32, fontSize: '0.95rem' }}>
+                              {candidate.title} ({Math.round(candidate.score * 100)}%)
+                            </MenuItem>
+                          ))}
+                        </TextField>
+
+                        <TextField
+                          label="Song Title"
+                          value={row.titleOverride || ''}
+                          InputProps={{ sx: { '& input': { py: 0.55, fontSize: '0.95rem' } } }}
+                          onFocus={() => setActiveRowIndex(rowIndex)}
+                          onChange={(event) =>
+                            onSelectionChange(rowIndex, {
+                              titleOverride: event.target.value,
+                            })
+                          }
+                        />
+
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr' }, gap: 1.25 }}>
+                          <TextField
+                            select
+                            label="Tune / Version"
+                            value={row.selectedVersionId || ''}
+                            SelectProps={{
+                              MenuProps: { PaperProps: { sx: { maxHeight: 280 } } },
+                              sx: { '& .MuiSelect-select': { py: 0.55, fontSize: '0.95rem' } },
+                            }}
+                            onFocus={() => setActiveRowIndex(rowIndex)}
+                            onChange={(event) =>
+                              onSelectionChange(rowIndex, {
+                                selectedVersionId: Number(event.target.value),
+                              })
+                            }
+                            disabled={!row.versions?.length || row.versions.length <= 1}
+                          >
+                            {row.versions?.map((version) => (
+                              <MenuItem key={version.id} value={version.id} sx={{ py: 0.4, minHeight: 32, fontSize: '0.95rem' }}>
+                                {version.tune_name || 'Default'}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+
+                          <TextField
+                            type="number"
+                            label="Capo"
+                            value={row.capo === '' || row.capo == null ? 0 : row.capo}
+                            inputProps={{ min: 0, step: 1 }}
+                            InputProps={{ sx: { '& input': { py: 0.55, fontSize: '0.95rem' } } }}
+                            onFocus={() => setActiveRowIndex(rowIndex)}
+                            onChange={(event) => {
+                              const next = Number(event.target.value);
+                              onSelectionChange(rowIndex, {
+                                capo: Number.isNaN(next) ? 0 : Math.max(0, next),
+                              });
+                            }}
+                          />
+                        </Box>
+
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                          <Typography
+                            component="button"
+                            type="button"
+                            onClick={() => onResetChordpro(rowIndex)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#0d47a1',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            Reset to default
+                          </Typography>
+                          <Button
+                            variant="text"
+                            color="error"
+                            size="small"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onDeleteRow(rowIndex);
+                            }}
+                            sx={{ minWidth: 'auto' }}
+                          >
+                            Delete card
+                          </Button>
+                        </Box>
+
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => toggleExpandedEditor(rowIndex)}
+                          sx={{ alignSelf: 'flex-start', p: 0, minWidth: 'auto' }}
+                        >
+                          {expandedEditors[rowIndex] ? '▲ Collapse editor' : '▼ Expand editor'}
+                        </Button>
+
+                        <SongBodyEditor
+                          value={row.chordproOverride || ''}
+                          rowIndex={rowIndex}
+                          isExpanded={Boolean(expandedEditors[rowIndex])}
+                          onSelectionChange={onSelectionChange}
+                          setActiveRowIndex={setActiveRowIndex}
+                        />
+                      </>
                     )}
-                    {(row.candidates || []).map((candidate) => (
-                      <MenuItem key={candidate.song_id} value={candidate.song_id} sx={{ py: 0.4, minHeight: 32, fontSize: '0.95rem' }}>
-                        {candidate.title} ({Math.round(candidate.score * 100)}%)
-                      </MenuItem>
-                    ))}
-                  </TextField>
-
-                  <TextField
-                    label="Song Title"
-                    value={row.titleOverride || ''}
-                    InputProps={{ sx: { '& input': { py: 0.55, fontSize: '0.95rem' } } }}
-                    onFocus={() => setActiveRowIndex(rowIndex)}
-                    onChange={(event) =>
-                      onSelectionChange(rowIndex, {
-                        titleOverride: event.target.value,
-                      })
-                    }
-                  />
-
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr' }, gap: 1.25 }}>
-                    <TextField
-                      select
-                      label="Tune / Version"
-                      value={row.selectedVersionId || ''}
-                      SelectProps={{
-                        MenuProps: { PaperProps: { sx: { maxHeight: 280 } } },
-                        sx: { '& .MuiSelect-select': { py: 0.55, fontSize: '0.95rem' } },
-                      }}
-                      onFocus={() => setActiveRowIndex(rowIndex)}
-                      onChange={(event) =>
-                        onSelectionChange(rowIndex, {
-                          selectedVersionId: Number(event.target.value),
-                        })
-                      }
-                      disabled={!row.versions?.length || row.versions.length <= 1}
-                    >
-                      {row.versions?.map((version) => (
-                        <MenuItem key={version.id} value={version.id} sx={{ py: 0.4, minHeight: 32, fontSize: '0.95rem' }}>
-                          {version.tune_name || 'Default'}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-
-                    <TextField
-                      type="number"
-                      label="Capo"
-                      value={row.capo === '' || row.capo == null ? 0 : row.capo}
-                      inputProps={{ min: 0, step: 1 }}
-                      InputProps={{ sx: { '& input': { py: 0.55, fontSize: '0.95rem' } } }}
-                      onFocus={() => setActiveRowIndex(rowIndex)}
-                      onChange={(event) => {
-                        const next = Number(event.target.value);
-                        onSelectionChange(rowIndex, {
-                          capo: Number.isNaN(next) ? 0 : Math.max(0, next),
-                        });
-                      }}
-                    />
-                  </Box>
-
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
-                    <Typography
-                      component="button"
-                      type="button"
-                      onClick={() => onResetChordpro(rowIndex)}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: '#0d47a1',
-                        cursor: 'pointer',
-                        fontSize: '0.875rem',
-                      }}
-                    >
-                      Reset to default
-                    </Typography>
-                    <Button
-                      variant="text"
-                      color="error"
-                      size="small"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDeleteRow(rowIndex);
-                      }}
-                      sx={{ minWidth: 'auto' }}
-                    >
-                      Delete card
-                    </Button>
-                  </Box>
-
-                  <Button
-                    variant="text"
-                    size="small"
-                    onClick={() => toggleExpandedEditor(rowIndex)}
-                    sx={{ alignSelf: 'flex-start', p: 0, minWidth: 'auto' }}
-                  >
-                    {expandedEditors[rowIndex] ? '▲ Collapse editor' : '▼ Expand editor'}
-                  </Button>
-
-                  <SongBodyEditor
-                    value={row.chordproOverride || ''}
-                    rowIndex={rowIndex}
-                    isExpanded={Boolean(expandedEditors[rowIndex])}
-                    onSelectionChange={onSelectionChange}
-                    setActiveRowIndex={setActiveRowIndex}
-                  />
-                </Stack>
-              </Box>
-            ))}
+                  </Stack>
+                </Box>
+              );
+            })}
         </Stack>
       </Paper>
 
@@ -401,28 +548,66 @@ function ReviewStep({
         <Stack spacing={1}>
           <Typography variant="subtitle1">Song List</Typography>
           <Box sx={{ maxHeight: 520, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
-            {matches.map((row, index) => (
-              <Box
-                key={`${row.input}-list-${index}`}
-                sx={{
-                  px: 1.5,
-                  py: 1,
-                  borderBottom: '1px solid #f0f0f0',
-                  fontWeight: activeRowIndex === index ? 700 : 400,
-                  backgroundColor: activeRowIndex === index ? '#eef4ff' : 'transparent',
-                  cursor: 'pointer',
-                }}
-                onClick={() => {
-                  setActiveRowIndex(index);
-                  scrollRowIntoCenter(index);
-                }}
-              >
-                {index + 1}. {labelForRow(row)}
-              </Box>
-            ))}
+            {(() => {
+              let listSection = null;
+              let listSongNum = 1;
+              return matches.map((row, index) => {
+                if (row.type === 'section') {
+                  listSection = row.id || `sec-${index}`;
+                  return (
+                    <Box
+                      key={`list-sec-${index}`}
+                      sx={{
+                        px: 1.5,
+                        py: 1,
+                        borderBottom: '1px solid #f0f0f0',
+                        fontWeight: activeRowIndex === index ? 700 : 600,
+                        backgroundColor: activeRowIndex === index ? '#eef4ff' : '#f5f5f5',
+                        color: '#1a237e',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => {
+                        setActiveRowIndex(index);
+                        scrollRowIntoCenter(index);
+                      }}
+                    >
+                      {row.title}
+                    </Box>
+                  );
+                }
+                const isIndented = listSection !== null;
+                return (
+                  <Box
+                    key={`${row.input}-list-${index}`}
+                    sx={{
+                      px: 1.5,
+                      py: 1,
+                      pl: isIndented ? 3.5 : 1.5,
+                      borderBottom: '1px solid #f0f0f0',
+                      borderLeft: isIndented ? '2px solid #c5cae9' : 'none',
+                      fontWeight: activeRowIndex === index ? 700 : 400,
+                      backgroundColor: activeRowIndex === index ? '#eef4ff' : 'transparent',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => {
+                      setActiveRowIndex(index);
+                      scrollRowIntoCenter(index);
+                    }}
+                  >
+                    {listSongNum++}. {labelForRow(row)}
+                  </Box>
+                );
+              });
+            })()}
           </Box>
         </Stack>
       </Paper>
+
+      <AddSectionModal
+        open={addSectionOpen}
+        onClose={() => setAddSectionOpen(false)}
+        onAddSection={onAddSection}
+      />
     </Box>
   );
 }
