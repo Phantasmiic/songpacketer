@@ -106,10 +106,12 @@ function safeTuneName(tuneName, tuneIndex, seen) {
 }
 
 export async function syncSongbase() {
-  const url = 'https://songbase.life/api/v2/app_data?language=english&updated_at=0';
+  // Use the Vite proxy configured in vite.config.js to bypass CORS
+  const url = '/api/songbase/app_data?language=english&updated_at=0';
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error('Failed to fetch from Songbase');
+    const text = await response.text();
+    throw new Error(`Failed to fetch from Songbase: HTTP ${response.status} - ${text}`);
   }
   const payload = await response.json();
   const items = Array.isArray(payload.songs) ? payload.songs : (Array.isArray(payload) ? payload : []);
@@ -192,29 +194,48 @@ export async function matchSongs(inputText) {
   const allSongs = await db.getAll('songs');
 
   if (!inputText || !inputText.trim()) {
-    return { matches: [] };
+    return { results: [] };
   }
 
-  // Use fuzzysort to search title and lyrics_plain
-  const results = fuzzysort.go(inputText, allSongs, {
-    keys: ['title', 'lyrics_plain'],
-    limit: 15,
-    threshold: -10000,
+  const lines = inputText.split('\n');
+  const results = [];
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    
+    // Strip leading numbers/bullets
+    const query = trimmed.replace(/^[\d\.\-\*\]\)]+\s*/, '').trim();
+    if (!query) return;
+
+    // Use fuzzysort to search title and lyrics_plain
+    const fuzzyResults = fuzzysort.go(query, allSongs, {
+      keys: ['title', 'lyrics_plain'],
+      limit: 15,
+      threshold: -10000,
+    });
+
+    const candidates = fuzzyResults.map(res => {
+      const song = res.obj;
+      return {
+        song_id: song.id, // backend expects song_id
+        title: song.title,
+        key: song.key,
+        preview: song.lyrics_plain.substring(0, 100).replace(/\n/g, ' ') + '...',
+        score: res.score,
+        versions: song.versions,
+      };
+    });
+
+    results.push({
+      input: trimmed,
+      index: index,
+      query: query,
+      candidates: candidates,
+    });
   });
 
-  const matches = results.map(res => {
-    const song = res.obj;
-    return {
-      id: song.id,
-      title: song.title,
-      key: song.key,
-      preview: song.lyrics_plain.substring(0, 100).replace(/\n/g, ' ') + '...',
-      score: res.score,
-      versions: song.versions,
-    };
-  });
-
-  return { matches };
+  return { results };
 }
 
 export async function fetchVersions(songId) {
