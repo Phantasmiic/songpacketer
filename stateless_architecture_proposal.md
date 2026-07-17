@@ -8,7 +8,8 @@
 - **PDFs**: Rewrite the Python PDF generator (`pdf.py`) in JavaScript (using `@react-pdf/renderer` or `pdfmake`) so PDFs generate right in the browser.
 
 ## Why do this?
-- **Free hosting forever** as a static site on Netlify or Vercel.
+- **Free hosting forever** as a static site on Vercel.
+  - *Note: Vercel provides a seamless edge redirect (`vercel.json`) that proxies the Songbase API. This elegantly bypasses browser CORS restrictions when syncing the library, requiring zero backend code on our end.*
 - **No more Docker** or database headaches for local development.
 - **Works entirely offline**. 
 
