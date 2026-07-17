@@ -14,7 +14,7 @@ import {
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 const SongSearchBox = memo(function SongSearchBox({
   initialValue,
@@ -505,7 +505,7 @@ function ReviewStep({
                                 fontWeight: 500,
                                 '&:hover': { background: 'transparent', color: 'primary.main' } 
                               }}
-                              startIcon={expandedEditors[rowIndex] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                              startIcon={expandedEditors[rowIndex] ? <ExpandMoreIcon /> : <ChevronRightIcon />}
                             >
                               Edit chords and lyrics
                             </Button>
