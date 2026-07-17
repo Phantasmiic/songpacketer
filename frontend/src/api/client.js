@@ -1,24 +1,22 @@
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
-  withCredentials: true,
-});
+import { syncSongbase as dbSyncSongbase, matchSongs as dbMatchSongs, fetchVersions as dbFetchVersions } from '../db/songs';
+import { 
+  listSongPackets as dbListSongPackets, 
+  createSongPacket as dbCreateSongPacket, 
+  getSongPacket as dbGetSongPacket,
+  updateSongPacketState as dbUpdateSongPacketState,
+  saveSongPacketVersion as dbSaveSongPacketVersion,
+  openLatestSongPacket as dbOpenLatestSongPacket
+} from '../db/packets';
+import { renderSongPacketPdf } from '../pdf/engine';
 
 export async function matchSongs(inputText, queries = []) {
-  const response = await api.post('/songs/match', {
-    input_text: inputText,
-    queries,
-  });
-  return response.data;
+  // DB matchSongs takes the input text and fuzzysorts against the local catalog.
+  return await dbMatchSongs(inputText);
 }
 
 export async function fetchVersions(songId) {
-  const response = await api.get(`/songs/${songId}/versions`);
-  return response.data;
+  return await dbFetchVersions(songId);
 }
-
-import { renderSongPacketPdf } from '../pdf/engine';
 
 export async function generatePacketPdf(
   selections,
@@ -34,91 +32,65 @@ export async function generatePacketPdf(
   );
 }
 
-
-export async function optimizePacketOrder(
-  selections,
-  maintainOriginalOrder = false,
-  showSectionHeadersInBody = false,
-  showSectionHeadersInIndex = true
-) {
-  const response = await api.post('/packet/optimize-order', {
-    selections,
-    maintain_original_order: maintainOriginalOrder,
-    show_section_headers_in_body: showSectionHeadersInBody,
-    show_section_headers_in_index: showSectionHeadersInIndex,
-  });
-  return response.data;
+export async function optimizePacketOrder(selections, maintainOriginalOrder = false) {
+  // The JS engine optimizes internally now if maintainOriginalOrder is false.
+  // This frontend shim returns the input selections as the ordered result to avoid breaking older React state expectations.
+  return { order: selections.map((_, index) => index) };
 }
 
 export async function syncSongbase() {
-  const response = await api.post('/songs/sync');
-  return response.data;
+  return await dbSyncSongbase();
 }
 
 export async function listSongPackets() {
-  const response = await api.get('/song-packets');
-  return response.data;
+  return await dbListSongPackets();
 }
 
 export async function createSongPacket(title, initialState = {}) {
-  const response = await api.post('/song-packets', {
-    title,
-    initial_state: initialState,
-  });
-  return response.data;
+  return await dbCreateSongPacket(title, initialState);
 }
 
 export async function openLatestSongPacket(packetId) {
-  const response = await api.post(`/song-packets/${packetId}/open-latest`);
-  return response.data;
+  return await dbOpenLatestSongPacket(packetId);
 }
 
 export async function updateSongPacketState(packetId, state, event = {}) {
-  const response = await api.patch(`/song-packets/${packetId}/state`, {
-    state,
-    event_type: event.eventType || '',
-    summary: event.summary || '',
-    change: event.change || {},
-  });
-  return response.data;
+  return await dbUpdateSongPacketState(
+    packetId, 
+    state.state || state, // Handle different legacy payload shapes
+    event.event_type || '', 
+    event.summary || '', 
+    event.change || {}
+  );
 }
 
 export async function saveSongPacketVersion(packetId, description = '') {
-  const response = await api.post(`/song-packets/${packetId}/save-version`, {
-    description,
-  });
-  return response.data;
+  return await dbSaveSongPacketVersion(packetId, description);
 }
 
+// History and version lists are embedded inside getSongPacket for the local db
 export async function listSongPacketVersions(packetId) {
-  const response = await api.get(`/song-packets/${packetId}/versions`);
-  return response.data;
-}
-
-export async function listSongPacketHistory(packetId) {
-  const response = await api.get(`/song-packets/${packetId}/history`);
-  return response.data;
+  const data = await dbGetSongPacket(packetId);
+  return { versions: data.versions || [] };
 }
 
 export async function activateSongPacketVersion(packetId, versionId) {
-  const response = await api.post(`/song-packets/${packetId}/activate-version`, {
-    version_id: versionId,
-  });
-  return response.data;
+  // Not fully supported in local DB yet, but stubbed to prevent errors
+  throw new Error("Activating legacy version is not fully supported locally.");
+}
+
+export async function listSongPacketHistory(packetId) {
+  const data = await dbGetSongPacket(packetId);
+  return { history: data.edit_history || [] };
 }
 
 export async function generateSongPacketVersionPdf(packetId, versionId) {
-  const response = await api.post(
-    `/song-packets/${packetId}/versions/${versionId}/generate`,
-    {},
-    { responseType: 'blob' }
-  );
-  const pages = Number(response.headers['x-packet-pages']);
-  const songSpills = Number(response.headers['x-packet-song-spills']);
-  return {
-    blob: response.data,
-    stats: Number.isFinite(pages) && Number.isFinite(songSpills)
-      ? { pages, songSpills }
-      : null,
-  };
+  // Grab the snapshot of this version and pass it to the PDF engine
+  const data = await dbGetSongPacket(packetId);
+  const version = data.versions.find(v => v.id === versionId);
+  if (!version || !version.snapshot) throw new Error("Version not found");
+  
+  // Note: we'd need to recreate the `selections` payload from the snapshot, but since we are
+  // migrating to 100% client side we will rely on the live packet state.
+  throw new Error("Generating PDF from legacy version snapshot is not fully supported locally.");
 }

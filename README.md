@@ -1,58 +1,40 @@
 # Song Packeter
 
-Song Packeter is a Dockerized web app for building printable PDF song packets from Songbase data.
+Song Packeter is a fully client-side web application for building beautifully formatted, printable PDF song packets from Songbase data.
 
 ## Stack
 
-- Backend: Django + Django REST Framework
 - Frontend: React + Vite + Material UI
-- Database: Postgres
-- Deployment/runtime: Docker Compose
+- Local Database: IndexedDB (`idb`)
+- Search: `fuzzysort`
+- PDF Rendering: `pdf-lib`
 
 ## What It Does
 
-- Syncs English songs from Songbase into a local Postgres cache.
-- Matches user input (titles or lyric fragments) to songs with fuzzy search.
-- Lets users refine matched songs (title, tune/version, capo, chord/lyric body).
-- Generates a two-column PDF packet.
-- Supports optimizer-based ordering plus manual drag/drop re-ordering and force-new-page controls.
-- Returns generation stats (`pages`, `song spills`) for each generated PDF.
+- **100% Offline Capable**: Runs completely in the browser with no backend required.
+- **Library Syncing**: Caches English songs directly from the Songbase API into your browser's IndexedDB.
+- **Lighting Fast Search**: Matches user input (titles or lyric fragments) to songs instantly using client-side fuzzy search.
+- **Packet Management**: Saves your working song packets and edit history to IndexedDB so you never lose your progress.
+- **Advanced PDF Layout**: Uses a custom, reverse-engineered typesetting engine (built natively on top of `pdf-lib`) to calculate perfect formatting and chord-lyric alignment.
+- **Simulated Annealing Optimizer**: Automatically shuffles the order of your packet to minimize the number of times a song spills across multiple pages or columns.
 
 ## Quick Start
 
 ```bash
-docker compose up --build
+cd frontend
+npm install
+npm run dev
 ```
 
-- Frontend: `http://localhost:5173`
-- Backend API root: `http://localhost:8000/api`
+Visit: `http://localhost:5173`
 
-## API Quick Test
-
-```bash
-curl -s http://localhost:8000/api | jq
-```
-
-## Documentation
-
-- Frontend: [docs/frontend.md](docs/frontend.md)
-- Backend: [docs/backend.md](docs/backend.md)
-- API: [docs/api.md](docs/api.md)
-- Optimization algorithm: [docs/optimization.md](docs/optimization.md)
-- UI + user workflow: [docs/ui-workflow.md](docs/ui-workflow.md)
+*(Note: On your first visit, click "Sync Library" in the top bar to pull down the Songbase catalog into your browser cache)*
 
 ## Tests
 
-Run backend tests inside Docker:
+The custom PDF typesetting algorithms (chord alignment, word wrapping, layout boundaries, and the layout optimizer) have been fully TDD'd in JavaScript.
 
 ```bash
-docker compose exec -T backend python manage.py test -v 1
-```
-
-Targeted suites:
-
-```bash
-docker compose exec -T backend python manage.py test tests.test_matching -v 1
-docker compose exec -T backend python manage.py test tests.test_pdf -v 1
-docker compose exec -T backend python manage.py test tests.test_packet_44_metrics -v 1
+cd frontend
+npm run test
 ```
