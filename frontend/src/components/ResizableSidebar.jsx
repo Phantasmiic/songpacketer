@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 
 export default function ResizableSidebar({ children, initialWidth = 500, minWidth = 300, maxWidth = 800 }) {
   const [width, setWidth] = useState(initialWidth);
+  const [isResizingState, setIsResizingState] = useState(false);
   const dragState = useRef({ isResizing: false, startX: 0, startWidth: 0 });
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
     const handleMouseUp = () => {
       if (dragState.current.isResizing) {
         dragState.current.isResizing = false;
+        setIsResizingState(false);
         document.body.style.cursor = 'default';
         document.body.style.userSelect = 'auto'; // Re-enable text selection
       }
@@ -42,6 +44,7 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
       startX: e.clientX,
       startWidth: width,
     };
+    setIsResizingState(true);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none'; // Prevent text selection while dragging
   };
@@ -77,8 +80,22 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
         }}
       />
       {/* Sidebar Content */}
-      <Box sx={{ width, flexShrink: 0 }}>
+      <Box sx={{ width, flexShrink: 0, position: 'relative' }}>
         {children}
+        {isResizingState && (
+          <Box 
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 9999,
+              cursor: 'col-resize',
+              bgcolor: 'transparent'
+            }}
+          />
+        )}
       </Box>
     </Box>
   );
