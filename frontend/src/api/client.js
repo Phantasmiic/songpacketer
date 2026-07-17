@@ -11,7 +11,7 @@ import { renderSongPacketPdf } from '../pdf/engine';
 
 export async function matchSongs(inputText, queries = []) {
   // DB matchSongs takes the input text and fuzzysorts against the local catalog.
-  return await dbMatchSongs(inputText);
+  return await dbMatchSongs(inputText, queries);
 }
 
 export async function fetchVersions(songId) {

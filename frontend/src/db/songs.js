@@ -189,15 +189,18 @@ export async function syncSongbase() {
   return { created, updated };
 }
 
-export async function matchSongs(inputText) {
+export async function matchSongs(inputText, queries = []) {
   const db = await getDb();
   const allSongs = await db.getAll('songs');
 
-  if (!inputText || !inputText.trim()) {
-    return { results: [] };
+  let lines = queries;
+  if (!lines || lines.length === 0) {
+    if (!inputText || !inputText.trim()) {
+      return { results: [] };
+    }
+    lines = inputText.split('\n');
   }
 
-  const lines = inputText.split('\n');
   const results = [];
 
   lines.forEach((line, index) => {
