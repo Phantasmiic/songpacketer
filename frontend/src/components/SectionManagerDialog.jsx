@@ -102,7 +102,7 @@ function createDragImage(count, firstSongTitle) {
   return container;
 }
 
-function CategoryItem({ id, title, color, count, isSelected, onClick, onDrop, onDelete }) {
+function CategoryItem({ id, title, color, count, isSelected, onClick, onDrop, onDelete, onRename }) {
   const [isDragOver, setIsDragOver] = useState(false);
   return (
     <Box
@@ -133,9 +133,38 @@ function CategoryItem({ id, title, color, count, isSelected, onClick, onDrop, on
     >
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flexGrow: 1 }}>
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: color || '#757575', flexShrink: 0 }} />
-        <Typography variant="body2" sx={{ fontWeight: isSelected ? 700 : 500, color: isSelected ? 'primary.main' : 'text.primary' }} noWrap>
-          {title}
-        </Typography>
+        
+        {isSelected && onRename ? (
+          <TextField
+            variant="standard"
+            value={title}
+            onChange={(e) => onRename(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.target.blur();
+              }
+            }}
+            placeholder="Untitled Section"
+            InputProps={{ disableUnderline: true, sx: { fontSize: '0.875rem', fontWeight: 700, color: 'primary.main', p: 0 } }}
+            size="small"
+            fullWidth
+            autoFocus
+          />
+        ) : (
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: isSelected ? 700 : 500,
+              color: isSelected ? 'primary.main' : 'text.primary',
+              fontStyle: title ? 'normal' : 'italic'
+            }}
+            noWrap
+          >
+            {title || 'Untitled Section'}
+          </Typography>
+        )}
+
         <Box
           sx={{
             px: 0.8,
@@ -234,12 +263,12 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
 
   const handleAddSection = () => {
     const title = newSectionTitle.trim();
-    if (!title) return;
+    // Allow empty section names by omitting the "if (!title) return;" check
 
     const newSecId = `sec-new-${Date.now()}`;
     const newSec = {
       id: newSecId,
-      title,
+      title, // could be ""
       color: PRESET_COLORS[sections.length % PRESET_COLORS.length],
       songs: [],
     };
@@ -497,6 +526,11 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
                   }}
                   onDrop={(e) => handleDrop(e, sec.id)}
                   onDelete={() => handleDeleteSection(sec.id)}
+                  onRename={(newTitle) => {
+                    setSections((prev) =>
+                      prev.map((s) => (s.id === sec.id ? { ...s, title: newTitle } : s))
+                    );
+                  }}
                 />
               ))}
 
