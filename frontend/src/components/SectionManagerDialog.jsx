@@ -464,7 +464,12 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
                 }}
                 fullWidth
               />
-              <Button variant="contained" size="small" onClick={handleAddSection} startIcon={<AddIcon />}>
+              <Button
+                variant="contained"
+                onClick={handleAddSection}
+                startIcon={<AddIcon />}
+                sx={{ height: 40, px: 2, flexShrink: 0 }}
+              >
                 Add
               </Button>
             </Stack>
