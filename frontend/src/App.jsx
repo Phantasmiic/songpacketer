@@ -13,9 +13,8 @@ import {
   MenuItem,
   Paper,
   Snackbar,
-  Step,
-  StepLabel,
-  Stepper,
+  Tab,
+  Tabs,
   TextField,
   Typography,
   Popover,
@@ -49,7 +48,7 @@ import {
   updateSongPacketTitle,
 } from './api/client';
 
-const steps = ['Input', 'Refine', 'Generate'];
+const steps = ['Input', 'Refine', 'Layout'];
 
 function toSelections(rows, versionsCacheRef = null) {
   return rows
@@ -1088,89 +1087,132 @@ function App() {
   const activeVersionNumber = activePacket?.current_version?.version_number || activePacket?.latest_version_number || 1;
 
   return (
-    <Container maxWidth={false} sx={{ py: 4, maxWidth: 1600 }}>
-      <Typography variant="h4" sx={{ mb: 2, fontWeight: 600 }}>
-        Song Packet Generator
-      </Typography>
-
-      <Stepper activeStep={step} sx={{ mb: 3 }}>
-        {steps.map((label) => (
-          <Step key={label}>
-            <StepLabel>{label}</StepLabel>
-          </Step>
-        ))}
-      </Stepper>
-
+    <Container maxWidth={false} sx={{ py: 2, maxWidth: 1600 }}>
+      {/* ── Unified sticky nav bar ─────────────────────────────── */}
       <Paper
-        elevation={2}
+        elevation={3}
         sx={{
           mb: 2,
-          p: 1.5,
+          px: 1.5,
+          py: 0.5,
           position: 'sticky',
-          top: 12,
+          top: 8,
           zIndex: 20,
           display: 'flex',
-          gap: 1,
-          flexWrap: 'wrap',
           alignItems: 'center',
+          gap: 1,
+          borderRadius: 2,
+          minHeight: 52,
         }}
       >
+        {/* Left: app title */}
+        <Typography
+          variant="subtitle1"
+          sx={{ fontWeight: 700, letterSpacing: '-0.3px', whiteSpace: 'nowrap', mr: 1 }}
+        >
+          Song Packeter
+        </Typography>
+
+        {/* Centre: tab nav — always rendered so the bar has consistent height */}
+        <Tabs
+          value={step}
+          onChange={(_, newVal) => {
+            // Back nav is always free; forward nav is gated
+            if (newVal < step) { setStep(newVal); return; }
+            if (newVal === 1 && step === 0 && activePacket) { setStep(1); return; }
+            if (newVal === 2 && canProceedToGenerate) { setStep(2); return; }
+          }}
+          sx={{
+            minHeight: 40,
+            '& .MuiTab-root': {
+              minHeight: 40,
+              py: 0.5,
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+            },
+          }}
+        >
+          {steps.map((label, idx) => (
+            <Tab
+              key={label}
+              label={label}
+              disabled={
+                (idx === 1 && !activePacket) ||
+                (idx === 2 && !canProceedToGenerate)
+              }
+            />
+          ))}
+        </Tabs>
+
+        {/* Contextual actions for step 0 */}
         {step === 0 && (
-          <Button variant="outlined" onClick={handleSync} disabled={loading}>
-            Sync English Songs From Songbase
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleSync}
+            disabled={loading}
+            sx={{ textTransform: 'none' }}
+          >
+            Sync Songs
           </Button>
         )}
+
+        {/* Contextual forward action for step 1 */}
         {step === 1 && (
-          <>
-            <Button variant="text" onClick={() => setStep(0)}>
-              Back
-            </Button>
-            <Button
-              variant="contained"
-              onClick={() => setStep(2)}
-              disabled={loading || !canProceedToGenerate}
-            >
-              Continue To Generate
-            </Button>
-          </>
-        )}
-        {step === 2 && (
-          <>
-            <Button variant="text" onClick={() => setStep(1)}>
-              Back
-            </Button>
-            <Button variant="contained" onClick={handleGeneratePdf} disabled={loading}>
-              Generate PDF
-            </Button>
-          </>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => setStep(2)}
+            disabled={loading || !canProceedToGenerate}
+            sx={{ textTransform: 'none' }}
+          >
+            Continue to Layout →
+          </Button>
         )}
 
-        <Button
-          variant="outlined"
-          disabled={loading || !activePacket?.id}
-          onClick={() => setSaveDialogOpen(true)}
-        >
-          Save Version
-        </Button>
-        {hasUnsavedEditorChanges ? (
-          <Chip
+        {/* Contextual action for step 2 */}
+        {step === 2 && (
+          <Button
+            variant="contained"
             size="small"
-            color="warning"
-            label="Editor changes not yet saved"
-            sx={{ ml: 0.5 }}
-          />
+            onClick={handleGeneratePdf}
+            disabled={loading}
+            sx={{ textTransform: 'none' }}
+          >
+            Generate PDF
+          </Button>
+        )}
+
+        {/* Save version — shown when packet loaded */}
+        {activePacket?.id ? (
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={loading}
+            onClick={() => setSaveDialogOpen(true)}
+            sx={{ textTransform: 'none' }}
+          >
+            Save Version
+          </Button>
         ) : null}
 
+        {hasUnsavedEditorChanges ? (
+          <Chip size="small" color="warning" label="Unsaved" sx={{ ml: 0.5 }} />
+        ) : null}
+
+        {/* Right: Manage Packet (shows packet name) */}
         {activePacket ? (
-          <Box sx={{ ml: 'auto' }}>
+          <Box sx={{ ml: 'auto', flexShrink: 0 }}>
             <Button
               variant="contained"
               color="primary"
+              size="small"
               startIcon={<SettingsIcon />}
               onClick={(event) => setPacketMenuAnchor(event.currentTarget)}
-              sx={{ textTransform: 'none', fontWeight: 600 }}
+              sx={{ textTransform: 'none', fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
             >
-              Manage Packet
+              {activePacket.title}
             </Button>
           </Box>
         ) : null}
