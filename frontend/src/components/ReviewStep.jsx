@@ -263,7 +263,7 @@ function ReviewStep({
                     border: '1px solid #e0e0e0',
                     borderRadius: 2,
                     p: 2,
-                    outline: activeRowIndex === rowIndex ? `2px solid ${sectionColor}` : 'none',
+                    outline: (activeRowIndex === rowIndex && isExpanded) ? `2px solid ${sectionColor}` : 'none',
                     backgroundColor: '#fff',
                     cursor: isExpanded ? 'default' : 'pointer',
                     '&:hover': {
