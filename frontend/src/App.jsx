@@ -445,6 +445,7 @@ function App() {
       applyPacketPayload(payload, true);
       setPacketMode('existing');
       setToast('Loaded latest packet version.');
+      setStep(1);
       await loadPacketList();
     } catch (err) {
       setError(err.message || 'Failed to open packet.');
@@ -1091,16 +1092,16 @@ function App() {
         elevation={3}
         sx={{
           mb: 2,
-          px: 1.5,
-          py: 0.5,
+          px: 2,
+          py: 1,
           position: 'sticky',
           top: 8,
           zIndex: 20,
           display: 'flex',
           alignItems: 'center',
-          gap: 1,
+          gap: 1.5,
           borderRadius: 2,
-          minHeight: 52,
+          minHeight: 68,
         }}
       >
         {/* Left: app title */}
@@ -1112,7 +1113,7 @@ function App() {
         </Typography>
 
         {/* Centre: inline step indicator */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {steps.map((label, idx) => {
             const isActive = step === idx;
             const isCompleted = step > idx;
@@ -1135,64 +1136,53 @@ function App() {
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 0.75,
-                    px: 1.25,
-                    py: 0.5,
-                    borderRadius: 1.5,
+                    gap: 1,
+                    px: 1.5,
+                    py: 0.75,
+                    borderRadius: 2,
                     cursor: isDisabled ? 'default' : 'pointer',
                     transition: 'background 0.15s',
-                    bgcolor: isActive ? 'primary.main' : 'transparent',
                     '&:hover': !isDisabled ? {
-                      bgcolor: isActive ? 'primary.dark' : 'action.hover',
+                      bgcolor: 'action.hover',
                     } : {},
                   }}
                 >
                   {/* Step number circle */}
                   <Box
                     sx={{
-                      width: 22,
-                      height: 22,
+                      width: 32,
+                      height: 32,
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.7rem',
+                      fontSize: '0.85rem',
                       fontWeight: 700,
                       flexShrink: 0,
-                      bgcolor: isActive
-                        ? 'white'
-                        : isCompleted
+                      bgcolor: isCompleted
                         ? 'success.main'
-                        : isDisabled
-                        ? 'action.disabled'
-                        : 'primary.main',
-                      color: isActive
+                        : isActive
                         ? 'primary.main'
-                        : isCompleted || !isDisabled
-                        ? 'white'
-                        : 'text.disabled',
+                        : 'action.disabled',
+                      color: isCompleted || isActive ? 'white' : 'text.disabled',
                     }}
                   >
                     {isCompleted ? '✓' : idx + 1}
                   </Box>
                   <Typography
-                    variant="body2"
                     sx={{
                       fontWeight: isActive ? 700 : 500,
-                      fontSize: '0.825rem',
-                      color: isActive
-                        ? 'white'
-                        : isDisabled
-                        ? 'text.disabled'
-                        : 'text.primary',
+                      fontSize: '1rem',
+                      color: isDisabled ? 'text.disabled' : 'text.primary',
                       userSelect: 'none',
+                      lineHeight: 1.2,
                     }}
                   >
                     {label}
                   </Typography>
                 </Box>
                 {idx < steps.length - 1 && (
-                  <Typography sx={{ color: 'text.disabled', fontSize: '1rem', mx: 0.25, userSelect: 'none' }}>›</Typography>
+                  <Typography sx={{ color: 'text.secondary', fontSize: '1.6rem', mx: 0.5, userSelect: 'none', fontWeight: 200, lineHeight: 1 }}>›</Typography>
                 )}
               </Box>
             );
