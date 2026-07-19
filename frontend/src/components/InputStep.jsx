@@ -184,89 +184,87 @@ function InputStep({
   }
 
   return (
-    <Box sx={{ maxWidth: 960, mx: 'auto', mt: 1, px: 2 }}>
-      <Grid container spacing={3.5} justifyContent="center">
-        <Grid item xs={12} sm={4}>
+    <Box sx={{ maxWidth: 1000, mx: 'auto', mt: 2, px: 2 }}>
+      <Grid container spacing={2.5} justifyContent="center">
+        <Grid item xs={12} md={4}>
           <Paper
             elevation={2}
             sx={{
-              p: 4,
-              height: '100%',
+              p: 2.25,
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              textAlign: 'center',
-              borderRadius: 3,
+              gap: 2,
+              borderRadius: 2.5,
               cursor: 'pointer',
               border: '1px solid #e2e8f0',
-              transition: 'all 0.25s ease-in-out',
+              transition: 'all 0.2s ease-in-out',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: 6,
+                transform: 'translateY(-2px)',
+                boxShadow: 4,
                 borderColor: 'primary.main',
               },
             }}
             onClick={() => setActiveView('create')}
           >
-            <AddCircleOutlineIcon color="primary" sx={{ fontSize: 48, mb: 2 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-              Create New Packet
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Paste a custom list of songs and match them against the Songbase index.
-            </Typography>
+            <AddCircleOutlineIcon color="primary" sx={{ fontSize: 32, flexShrink: 0 }} />
+            <Box sx={{ textAlign: 'left', minWidth: 0 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                Create New Packet
+              </Typography>
+              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                Match a list of song titles
+              </Typography>
+            </Box>
           </Paper>
         </Grid>
 
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={12} md={4}>
           <Paper
             elevation={2}
             sx={{
-              p: 4,
-              height: '100%',
+              p: 2.25,
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              textAlign: 'center',
-              borderRadius: 3,
+              gap: 2,
+              borderRadius: 2.5,
               cursor: 'pointer',
               border: '1px solid #e2e8f0',
-              transition: 'all 0.25s ease-in-out',
+              transition: 'all 0.2s ease-in-out',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: 6,
+                transform: 'translateY(-2px)',
+                boxShadow: 4,
                 borderColor: 'primary.main',
               },
             }}
             onClick={() => setActiveView('open')}
           >
-            <FolderOpenIcon color="primary" sx={{ fontSize: 48, mb: 2 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-              Open Saved Packet
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Load an existing song packet list saved in your local browser session.
-            </Typography>
+            <FolderOpenIcon color="primary" sx={{ fontSize: 32, flexShrink: 0 }} />
+            <Box sx={{ textAlign: 'left', minWidth: 0 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                Open Saved Packet
+              </Typography>
+              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                Load from your local browser
+              </Typography>
+            </Box>
           </Paper>
         </Grid>
 
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={12} md={4}>
           <Paper
             elevation={2}
             sx={{
-              p: 4,
-              height: '100%',
+              p: 2.25,
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              textAlign: 'center',
-              borderRadius: 3,
+              gap: 2,
+              borderRadius: 2.5,
               cursor: 'pointer',
               border: '1px solid #e2e8f0',
-              transition: 'all 0.25s ease-in-out',
+              transition: 'all 0.2s ease-in-out',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: 6,
+                transform: 'translateY(-2px)',
+                boxShadow: 4,
                 borderColor: 'primary.main',
               },
             }}
@@ -275,13 +273,15 @@ function InputStep({
               if (fileInput) fileInput.click();
             }}
           >
-            <CloudUploadIcon color="primary" sx={{ fontSize: 48, mb: 2 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-              Import Backup File
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Upload a previously exported packet JSON file to restore it.
-            </Typography>
+            <CloudUploadIcon color="primary" sx={{ fontSize: 32, flexShrink: 0 }} />
+            <Box sx={{ textAlign: 'left', minWidth: 0 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                Import Backup File
+              </Typography>
+              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                Restore from a JSON file
+              </Typography>
+            </Box>
             <input
               id="dashboard-json-uploader"
               type="file"
