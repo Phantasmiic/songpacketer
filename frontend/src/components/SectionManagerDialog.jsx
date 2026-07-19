@@ -10,25 +10,87 @@ import {
   Stack,
   TextField,
   IconButton,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
   Card,
   CardContent,
+  Divider,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 
 const PRESET_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#00838f', '#455a64'];
+
+function CategoryItem({ id, title, color, count, isSelected, onClick, onDrop, onDelete }) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  return (
+    <Box
+      onClick={onClick}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragOver(true);
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        setIsDragOver(false);
+        onDrop(e);
+      }}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        p: 1.25,
+        borderRadius: 1.5,
+        bgcolor: isSelected ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+        border: isDragOver ? `2px dashed ${color || '#1976d2'}` : '2px solid transparent',
+        cursor: 'pointer',
+        transition: 'background-color 0.15s, border 0.15s',
+        '&:hover': {
+          bgcolor: isSelected ? 'rgba(25, 118, 210, 0.12)' : '#f0f0f0',
+        },
+      }}
+    >
+      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flexGrow: 1 }}>
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: color || '#757575', flexShrink: 0 }} />
+        <Typography variant="body2" sx={{ fontWeight: isSelected ? 700 : 500, color: isSelected ? 'primary.main' : 'text.primary' }} noWrap>
+          {title}
+        </Typography>
+        <Box
+          sx={{
+            px: 0.8,
+            py: 0.2,
+            borderRadius: 99,
+            bgcolor: isSelected ? 'primary.main' : '#e0e0e0',
+            color: isSelected ? '#fff' : 'text.secondary',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+          }}
+        >
+          {count}
+        </Box>
+      </Stack>
+
+      {onDelete && (
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          color="error"
+          sx={{ ml: 1, p: 0.5 }}
+        >
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      )}
+    </Box>
+  );
+}
 
 export default function SectionManagerDialog({ open, onClose, matches, onSave }) {
   const [sections, setSections] = useState([]);
   const [unassigned, setUnassigned] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('unassigned');
   const [selectedSongIds, setSelectedSongIds] = useState(new Set());
   const [newSectionTitle, setNewSectionTitle] = useState('');
-  const [targetSectionId, setTargetSectionId] = useState('');
 
   // Drag select marquee ref
   const rightPaneRef = useRef(null);
@@ -69,18 +131,14 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
     setUnassigned(unassignedList);
     setSelectedSongIds(new Set());
     setNewSectionTitle('');
-    if (sectionsList.length > 0) {
-      setTargetSectionId(sectionsList[0].id);
-    } else {
-      setTargetSectionId('');
-    }
+    setSelectedCategory('unassigned');
   }, [open, matches]);
 
   const handleSave = () => {
-    // Rebuild the flat matches array
+    // Rebuild flat matches array
     const flattened = [...unassigned.map(({ clientRowId, ...rest }) => rest)];
     sections.forEach((sec) => {
-      // Save section
+      // Save section header
       flattened.push({ type: 'section', title: sec.title, id: sec.id });
       // Save section songs
       sec.songs.forEach(({ clientRowId, ...rest }) => {
@@ -105,7 +163,7 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
 
     setSections((prev) => [...prev, newSec]);
     setNewSectionTitle('');
-    setTargetSectionId(newSecId);
+    setSelectedCategory(newSecId);
   };
 
   const handleDeleteSection = (secId) => {
@@ -118,8 +176,8 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
     // Remove section
     setSections((prev) => prev.filter((s) => s.id !== secId));
 
-    if (targetSectionId === secId) {
-      setTargetSectionId('');
+    if (selectedCategory === secId) {
+      setSelectedCategory('unassigned');
     }
   };
 
@@ -136,51 +194,15 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
     });
   };
 
-  // Batch assign selected songs to target section
-  const handleBatchAssign = () => {
-    if (!targetSectionId || selectedSongIds.size === 0) return;
-
-    // Find target section
-    const targetSec = sections.find((s) => s.id === targetSectionId);
-    if (!targetSec) return;
-
-    // Gather selected songs from sections and unassigned
-    const songsToAssign = [];
-    const filterOutSelected = (songList) =>
-      songList.filter((s) => {
-        if (selectedSongIds.has(s.clientRowId)) {
-          songsToAssign.push(s);
-          return false;
-        }
-        return true;
-      });
-
-    const updatedSections = sections.map((sec) => ({
-      ...sec,
-      songs: filterOutSelected(sec.songs),
-    }));
-
-    const updatedUnassigned = filterOutSelected(unassigned);
-
-    // Append to target section songs list
-    const finalSections = updatedSections.map((sec) => {
-      if (sec.id === targetSectionId) {
-        return {
-          ...sec,
-          songs: [...sec.songs, ...songsToAssign],
-        };
-      }
-      return sec;
-    });
-
-    setSections(finalSections);
-    setUnassigned(updatedUnassigned);
-    setSelectedSongIds(new Set());
-  };
-
-  // HTML5 Drag and Drop Handlers for left-pane lists
-  const handleDragStart = (e, clientRowId, sourceSecId) => {
-    e.dataTransfer.setData('text/plain', JSON.stringify({ clientRowId, sourceSecId }));
+  // HTML5 Drag and Drop Handlers for dragging songs from right pane to left categories
+  const handleDragStart = (e, clientRowId) => {
+    // Package selected song IDs
+    let dragIds = [clientRowId];
+    if (selectedSongIds.has(clientRowId)) {
+      dragIds = Array.from(selectedSongIds);
+    }
+    
+    e.dataTransfer.setData('application/json', JSON.stringify({ dragIds, sourceCategory: selectedCategory }));
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -188,53 +210,48 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
     e.preventDefault();
   };
 
-  const handleDrop = (e, targetSecId) => {
+  const handleDrop = (e, targetCategory) => {
     e.preventDefault();
     try {
-      const dataStr = e.dataTransfer.getData('text/plain');
+      const dataStr = e.dataTransfer.getData('application/json');
       if (!dataStr) return;
-      const { clientRowId, sourceSecId } = JSON.parse(dataStr);
+      const { dragIds, sourceCategory } = JSON.parse(dataStr);
 
-      if (sourceSecId === targetSecId) return;
+      if (sourceCategory === targetCategory) return;
 
-      // Find the dragged song
-      let draggedSong = null;
-      if (sourceSecId === 'unassigned') {
-        draggedSong = unassigned.find((s) => s.clientRowId === clientRowId);
-      } else {
-        const sourceSec = sections.find((s) => s.id === sourceSecId);
-        draggedSong = sourceSec?.songs.find((s) => s.clientRowId === clientRowId);
-      }
-
-      if (!draggedSong) return;
-
-      // Remove from source
-      if (sourceSecId === 'unassigned') {
-        setUnassigned((prev) => prev.filter((s) => s.clientRowId !== clientRowId));
+      // Extract dragged songs from source list
+      let songsToMove = [];
+      if (sourceCategory === 'unassigned') {
+        songsToMove = unassigned.filter((s) => dragIds.includes(s.clientRowId));
+        setUnassigned((prev) => prev.filter((s) => !dragIds.includes(s.clientRowId)));
       } else {
         setSections((prev) =>
-          prev.map((s) => {
-            if (s.id === sourceSecId) {
-              return { ...s, songs: s.songs.filter((song) => song.clientRowId !== clientRowId) };
+          prev.map((sec) => {
+            if (sec.id === sourceCategory) {
+              songsToMove = sec.songs.filter((s) => dragIds.includes(s.clientRowId));
+              return { ...sec, songs: sec.songs.filter((s) => !dragIds.includes(s.clientRowId)) };
             }
-            return s;
+            return sec;
           })
         );
       }
 
-      // Add to target
-      if (targetSecId === 'unassigned') {
-        setUnassigned((prev) => [...prev, draggedSong]);
+      // Add songs to target list
+      if (targetCategory === 'unassigned') {
+        setUnassigned((prev) => [...prev, ...songsToMove]);
       } else {
         setSections((prev) =>
-          prev.map((s) => {
-            if (s.id === targetSecId) {
-              return { ...s, songs: [...s.songs, draggedSong] };
+          prev.map((sec) => {
+            if (sec.id === targetCategory) {
+              return { ...sec, songs: [...sec.songs, ...songsToMove] };
             }
-            return s;
+            return sec;
           })
         );
       }
+
+      // Clear selection after drag finishes
+      setSelectedSongIds(new Set());
     } catch (err) {
       console.error('Drop error:', err);
     }
@@ -242,8 +259,10 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
 
   // Marquee Drag-select event handlers
   const handleMouseDown = (e) => {
-    // Only drag marquee on left click and directly on the right pane container or its empty space
+    // Only drag marquee on left click and directly on the right pane container or its empty space (not cards)
     if (e.button !== 0) return;
+    if (e.target.closest('.song-selectable-card')) return;
+
     const rect = rightPaneRef.current.getBoundingClientRect();
     const startX = e.clientX - rect.left;
     const startY = e.clientY - rect.top;
@@ -264,7 +283,7 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
       currentY,
     }));
 
-    // Perform bounding box calculations to select cards in real-time
+    // Bounding box selection calculations
     const parentRect = rightPaneRef.current.getBoundingClientRect();
     const selectBox = {
       left: Math.min(marquee.startX, currentX) + parentRect.left,
@@ -280,7 +299,6 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
       const elId = el.getAttribute('data-id');
       const elRect = el.getBoundingClientRect();
 
-      // Check intersection
       const intersects = !(
         elRect.left > selectBox.right ||
         elRect.right < selectBox.left ||
@@ -307,11 +325,14 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
     return chosen?.title || song.selected?.title || song.titleOverride || song.input || 'Untitled';
   };
 
-  // All songs list for the right pane pool
-  const allSongPool = [
-    ...unassigned,
-    ...sections.flatMap((s) => s.songs),
-  ];
+  // Filter songs by currently selected category
+  const rightPaneSongs = selectedCategory === 'unassigned'
+    ? unassigned
+    : (sections.find((s) => s.id === selectedCategory)?.songs || []);
+
+  const activeCategoryColor = selectedCategory === 'unassigned'
+    ? '#757575'
+    : (sections.find((s) => s.id === selectedCategory)?.color || '#1976d2');
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
@@ -320,11 +341,12 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
           Manage Sections
         </Typography>
       </DialogTitle>
+      
       <DialogContent sx={{ p: 0, display: 'flex', height: '70vh' }}>
-        {/* Left Pane: Sections Panel */}
+        {/* Left Pane: Categories list */}
         <Box
           sx={{
-            width: '38%',
+            width: '32%',
             borderRight: '1px solid #e0e0e0',
             bgcolor: '#fcfcfc',
             display: 'flex',
@@ -354,161 +376,83 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
           </Box>
 
           <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
-            <Stack spacing={2}>
-              {/* Unassigned section drop area */}
-              <Box
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, 'unassigned')}
-                sx={{
-                  border: '1px dashed #bdbdbd',
-                  borderRadius: 2,
-                  p: 1.5,
-                  bgcolor: '#fafafa',
-                  minHeight: 80,
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.secondary', mb: 1 }}>
-                  Unassigned ({unassigned.length})
-                </Typography>
-                <Stack spacing={1}>
-                  {unassigned.map((song) => (
-                    <Box
-                      key={song.clientRowId}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, song.clientRowId, 'unassigned')}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        p: 1,
-                        bgcolor: '#fff',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: 1,
-                        cursor: 'grab',
-                        '&:active': { cursor: 'grabbing' },
-                      }}
-                    >
-                      <DragIndicatorIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                      <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-                        {getSongTitle(song)}
-                      </Typography>
-                    </Box>
-                  ))}
-                  {unassigned.length === 0 && (
-                    <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', display: 'block', textAlign: 'center', py: 1 }}>
-                      No unassigned songs. Drag songs here to remove them from sections.
-                    </Typography>
-                  )}
-                </Stack>
-              </Box>
-
+            <Stack spacing={1}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, px: 1, mb: 0.5 }}>
+                SECTIONS
+              </Typography>
+              
               {/* Sections list */}
               {sections.map((sec) => (
-                <Box
+                <CategoryItem
                   key={sec.id}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, sec.id)}
-                  sx={{
-                    border: `1px solid ${sec.color}`,
-                    borderRadius: 2,
-                    p: 1.5,
-                    bgcolor: '#fff',
-                    minHeight: 100,
+                  id={sec.id}
+                  title={sec.title}
+                  color={sec.color}
+                  count={sec.songs.length}
+                  isSelected={selectedCategory === sec.id}
+                  onClick={() => {
+                    setSelectedCategory(sec.id);
+                    setSelectedSongIds(new Set());
                   }}
-                >
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: sec.color }} />
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: sec.color }}>
-                        {sec.title} ({sec.songs.length})
-                      </Typography>
-                    </Stack>
-                    <IconButton size="small" onClick={() => handleDeleteSection(sec.id)} color="error">
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Stack>
-
-                  <Stack spacing={1}>
-                    {sec.songs.map((song) => (
-                      <Box
-                        key={song.clientRowId}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, song.clientRowId, sec.id)}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1,
-                          p: 1,
-                          bgcolor: '#fff',
-                          border: '1px solid #e0e0e0',
-                          borderLeft: `3px solid ${sec.color}`,
-                          borderRadius: 1,
-                          cursor: 'grab',
-                          '&:active': { cursor: 'grabbing' },
-                        }}
-                      >
-                        <DragIndicatorIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                        <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-                          {getSongTitle(song)}
-                        </Typography>
-                      </Box>
-                    ))}
-                    {sec.songs.length === 0 && (
-                      <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', display: 'block', textAlign: 'center', py: 1 }}>
-                        Empty. Drag songs here or batch-assign from the right.
-                      </Typography>
-                    )}
-                  </Stack>
-                </Box>
+                  onDrop={(e) => handleDrop(e, sec.id)}
+                  onDelete={() => handleDeleteSection(sec.id)}
+                />
               ))}
+
+              {sections.length === 0 && (
+                <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', px: 1, py: 1 }}>
+                  No sections created yet. Add a section above.
+                </Typography>
+              )}
+
+              <Divider sx={{ my: 1.5 }} />
+
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, px: 1, mb: 0.5 }}>
+                UNASSIGNED
+              </Typography>
+
+              {/* Unassigned category */}
+              <CategoryItem
+                id="unassigned"
+                title="Unassigned Songs"
+                color="#757575"
+                count={unassigned.length}
+                isSelected={selectedCategory === 'unassigned'}
+                onClick={() => {
+                  setSelectedCategory('unassigned');
+                  setSelectedSongIds(new Set());
+                }}
+                onDrop={(e) => handleDrop(e, 'unassigned')}
+              />
             </Stack>
           </Box>
         </Box>
 
-        {/* Right Pane: Song Pool Panel */}
+        {/* Right Pane: Selected category song pool */}
         <Box
           sx={{
-            width: '62%',
+            width: '68%',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
           }}
         >
-          {/* Batch assign options */}
-          <Box sx={{ p: 2, borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Song Pool ({allSongPool.length})
-            </Typography>
+          {/* Header indicating current view */}
+          <Box sx={{ p: 2, borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Stack direction="row" spacing={1.5} alignItems="center">
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {selectedSongIds.size} selected
+              <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: activeCategoryColor }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                {selectedCategory === 'unassigned' ? 'Unassigned Songs' : sections.find((s) => s.id === selectedCategory)?.title} ({rightPaneSongs.length})
               </Typography>
-              <FormControl size="small" sx={{ minWidth: 150 }} disabled={sections.length === 0 || selectedSongIds.size === 0}>
-                <InputLabel>Assign Selected To</InputLabel>
-                <Select
-                  value={targetSectionId}
-                  label="Assign Selected To"
-                  onChange={(e) => setTargetSectionId(e.target.value)}
-                >
-                  {sections.map((sec) => (
-                    <MenuItem key={sec.id} value={sec.id}>
-                      {sec.title}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={handleBatchAssign}
-                disabled={sections.length === 0 || selectedSongIds.size === 0}
-              >
-                Apply
-              </Button>
             </Stack>
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+              {selectedSongIds.size > 0 
+                ? `${selectedSongIds.size} song(s) selected (drag card to move group)`
+                : 'Click or drag selection box to select. Drag cards to move.'}
+            </Typography>
           </Box>
 
-          {/* Song grid view with marquee select */}
+          {/* Song grid view */}
           <Box
             ref={rightPaneRef}
             onMouseDown={handleMouseDown}
@@ -520,11 +464,11 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
               overflowY: 'auto',
               p: 2,
               position: 'relative',
-              userSelect: 'none',
+              cursor: isDraggingMarquee.current ? 'crosshair' : 'default',
               bgcolor: '#fafafa',
             }}
           >
-            {/* Draw selection marquee */}
+            {/* Draw selection marquee overlay */}
             {marquee && (
               <Box
                 sx={{
@@ -546,29 +490,35 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
                 gap: 2,
+                // Apply cursor style on the background for marquee selection
+                height: '100%',
+                minHeight: '100%',
+                cursor: 'crosshair',
               }}
             >
-              {allSongPool.map((song) => {
+              {rightPaneSongs.map((song) => {
                 const isSelected = selectedSongIds.has(song.clientRowId);
-                const sectionColor = sections.find((s) => s.songs.some((songItem) => songItem.clientRowId === song.clientRowId))?.color || '#bdbdbd';
                 return (
                   <Card
                     key={song.clientRowId}
                     data-id={song.clientRowId}
                     className="song-selectable-card"
+                    draggable="true"
+                    onDragStart={(e) => handleDragStart(e, song.clientRowId)}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleToggleSelect(song.clientRowId);
                     }}
                     sx={{
-                      cursor: 'pointer',
-                      border: isSelected ? '2px solid #1976d2' : `1px solid ${sectionColor}`,
+                      cursor: 'grab',
+                      '&:active': { cursor: 'grabbing' },
+                      border: isSelected ? '2px solid #1976d2' : `1px solid #e0e0e0`,
+                      borderLeft: `4px solid ${activeCategoryColor}`,
                       bgcolor: isSelected ? '#eef4ff' : '#fff',
                       boxShadow: 'none',
                       transition: 'border 0.15s, background-color 0.15s',
                       userSelect: 'none',
-                      height: '100%',
-                      minHeight: 80,
+                      height: '80px',
                       display: 'flex',
                       alignItems: 'center',
                     }}
@@ -586,16 +536,17 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
               })}
             </Box>
 
-            {allSongPool.length === 0 && (
+            {rightPaneSongs.length === 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                <Typography variant="body1" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                  No songs in current packet.
+                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                  No songs in this category. Drag songs here from other categories to assign them.
                 </Typography>
               </Box>
             )}
           </Box>
         </Box>
       </DialogContent>
+      
       <DialogActions sx={{ borderTop: '1px solid #eee', px: 3, py: 2 }}>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" onClick={handleSave}>
