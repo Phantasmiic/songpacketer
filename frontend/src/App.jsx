@@ -1409,12 +1409,14 @@ function App() {
           />
         )}
         </Box>
-        <Box sx={{ display: { xs: 'none', lg: 'contents' } }}>
-          <ResizeHandle onMouseDown={startResize} />
-          <ResizableSidebarPanel width={sidebarWidth} isResizing={sidebarResizing}>
-            <PdfPreviewSidebar previewUrl={previewPdfUrl} isGenerating={isGeneratingPreview} />
-          </ResizableSidebarPanel>
-        </Box>
+        {step > 0 && activePacket ? (
+          <Box sx={{ display: { xs: 'none', lg: 'contents' } }}>
+            <ResizeHandle onMouseDown={startResize} />
+            <ResizableSidebarPanel width={sidebarWidth} isResizing={sidebarResizing}>
+              <PdfPreviewSidebar previewUrl={previewPdfUrl} isGenerating={isGeneratingPreview} />
+            </ResizableSidebarPanel>
+          </Box>
+        ) : null}
       </Box>
 
       <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} fullWidth maxWidth="sm">
