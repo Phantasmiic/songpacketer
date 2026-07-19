@@ -619,7 +619,19 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
                     }}
                   >
                     <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 }, width: '100%' }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, lineHeight: 1.2 }} noWrap>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{
+                          fontWeight: 700,
+                          mb: 0.5,
+                          lineHeight: 1.2,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
                         {getSongTitle(song)}
                       </Typography>
                       <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }} noWrap>
