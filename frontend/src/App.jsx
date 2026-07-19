@@ -24,7 +24,7 @@ import InputStep from './components/InputStep';
 import ReviewStep from './components/ReviewStep';
 import GenerateStep from './components/GenerateStep';
 import PdfPreviewSidebar from './components/PdfPreviewSidebar';
-import ResizableSidebar from './components/ResizableSidebar';
+import { useResizableSidebar, ResizeHandle, ResizableSidebarPanel } from './components/ResizableSidebar';
 import {
   activateSongPacketVersion,
   createSongPacket,
@@ -133,6 +133,7 @@ function App() {
   const [packetMenuAnchor, setPacketMenuAnchor] = useState(null);
   const [hasUnsavedEditorChanges, setHasUnsavedEditorChanges] = useState(false);
   const [previewPdfUrl, setPreviewPdfUrl] = useState(null);
+  const { width: sidebarWidth, isResizing: sidebarResizing, startResize } = useResizableSidebar({ initialWidth: 500, minWidth: 350, maxWidth: 1000 });
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const previewTimerRef = useRef(null);
 
@@ -1100,7 +1101,7 @@ function App() {
         </Alert>
       ) : null}
 
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: { xs: 3, lg: 0 } }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: 'stretch', gap: { xs: 3, lg: 0 } }}>
         <Box sx={{ minWidth: 0, flexGrow: 1, mb: 2 }}>
         {step === 0 && (
           <InputStep
@@ -1155,10 +1156,11 @@ function App() {
           />
         )}
         </Box>
-        <Box sx={{ display: { xs: 'none', lg: 'block' }, flexShrink: 0 }}>
-          <ResizableSidebar initialWidth={500} minWidth={350} maxWidth={1000}>
+        <Box sx={{ display: { xs: 'none', lg: 'contents' } }}>
+          <ResizeHandle onMouseDown={startResize} />
+          <ResizableSidebarPanel width={sidebarWidth} isResizing={sidebarResizing}>
             <PdfPreviewSidebar previewUrl={previewPdfUrl} isGenerating={isGeneratingPreview} />
-          </ResizableSidebar>
+          </ResizableSidebarPanel>
         </Box>
       </Box>
 

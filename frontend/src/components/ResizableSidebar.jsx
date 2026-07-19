@@ -1,103 +1,94 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Box } from '@mui/material';
 
-export default function ResizableSidebar({ children, initialWidth = 500, minWidth = 300, maxWidth = 800 }) {
+export function useResizableSidebar({ initialWidth = 500, minWidth = 300, maxWidth = 800 } = {}) {
   const [width, setWidth] = useState(initialWidth);
-  const [isResizingState, setIsResizingState] = useState(false);
-  const dragState = useRef({ isResizing: false, startX: 0, startWidth: 0 });
+  const [isResizing, setIsResizing] = useState(false);
+  const dragState = useRef({ active: false, startX: 0, startWidth: 0 });
 
   useEffect(() => {
     const handleMouseMove = (e) => {
-      if (!dragState.current.isResizing) return;
-      
+      if (!dragState.current.active) return;
       const deltaX = e.clientX - dragState.current.startX;
-      // Since sidebar is on the right, moving mouse left (negative deltaX) increases width
       const newWidth = dragState.current.startWidth - deltaX;
-      
-      // Add constraints
-      const constrainedWidth = Math.max(minWidth, Math.min(newWidth, maxWidth, window.innerWidth - 400));
-      setWidth(constrainedWidth);
+      const constrained = Math.max(minWidth, Math.min(newWidth, maxWidth, window.innerWidth - 400));
+      setWidth(constrained);
     };
 
     const handleMouseUp = () => {
-      if (dragState.current.isResizing) {
-        dragState.current.isResizing = false;
-        setIsResizingState(false);
-        document.body.style.cursor = 'default';
-        document.body.style.userSelect = 'auto'; // Re-enable text selection
+      if (dragState.current.active) {
+        dragState.current.active = false;
+        setIsResizing(false);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
       }
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [minWidth, maxWidth]);
 
-  const handleMouseDown = (e) => {
+  const startResize = (e) => {
     e.preventDefault();
-    dragState.current = {
-      isResizing: true,
-      startX: e.clientX,
-      startWidth: width,
-    };
-    setIsResizingState(true);
+    dragState.current = { active: true, startX: e.clientX, startWidth: width };
+    setIsResizing(true);
     document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none'; // Prevent text selection while dragging
+    document.body.style.userSelect = 'none';
   };
 
+  return { width, isResizing, startResize };
+}
+
+// Grabber bar rendered between the two columns
+export function ResizeHandle({ onMouseDown }) {
   return (
-    <Box sx={{ display: 'flex', height: '100%', position: 'relative', zIndex: 50 }}>
-      {/* Grabber Bar */}
-      <Box
-        onMouseDown={handleMouseDown}
-        sx={{
-          width: '16px',
-          cursor: 'col-resize',
-          flexShrink: 0,
-          bgcolor: 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'background-color 0.2s',
-          marginRight: '4px',
-          marginLeft: '4px',
-          zIndex: 50,
-          '&:hover': {
-            bgcolor: 'rgba(0,0,0,0.05)',
-            borderRadius: '8px',
-          },
-          '&::after': {
-            content: '""',
-            display: 'block',
-            width: '4px',
-            height: '40px',
-            bgcolor: '#bdbdbd',
-            borderRadius: '2px',
-          }
-        }}
-      />
-      {/* Sidebar Content */}
-      <Box sx={{ width, flexShrink: 0, position: 'relative' }}>
-        {children}
-        {isResizingState && (
-          <Box 
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 9999,
-              cursor: 'col-resize',
-              bgcolor: 'transparent'
-            }}
-          />
-        )}
-      </Box>
+    <Box
+      onMouseDown={onMouseDown}
+      sx={{
+        width: '24px',
+        flexShrink: 0,
+        cursor: 'col-resize',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'background-color 0.15s',
+        zIndex: 20,
+        '&:hover': {
+          bgcolor: 'rgba(0,0,0,0.05)',
+          borderRadius: '6px',
+        },
+        '&::after': {
+          content: '""',
+          display: 'block',
+          width: '4px',
+          height: '40px',
+          bgcolor: '#bdbdbd',
+          borderRadius: '2px',
+        },
+      }}
+    />
+  );
+}
+
+// Sidebar panel that blocks iframe mouse capture during resize
+export function ResizableSidebarPanel({ width, isResizing, children }) {
+  return (
+    <Box sx={{ width, flexShrink: 0, position: 'relative' }}>
+      {children}
+      {isResizing && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 9999,
+            cursor: 'col-resize',
+          }}
+        />
+      )}
     </Box>
   );
 }
