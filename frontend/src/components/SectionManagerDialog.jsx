@@ -586,10 +586,11 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
                   {selectedSongIds.size} song(s) selected (drag card to move group)
                 </Typography>
                 <Button
-                  variant="text"
+                  variant="outlined"
                   size="small"
+                  color="error"
                   onClick={() => setSelectedSongIds(new Set())}
-                  sx={{ textTransform: 'none', py: 0.2, px: 1, minWidth: 'auto' }}
+                  sx={{ textTransform: 'none', py: 0.4, px: 1.25 }}
                 >
                   Deselect All
                 </Button>
