@@ -580,11 +580,25 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
                 {selectedCategory === 'unassigned' ? 'Unassigned Songs' : sections.find((s) => s.id === selectedCategory)?.title} ({rightPaneSongs.length})
               </Typography>
             </Stack>
-            <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-              {selectedSongIds.size > 0 
-                ? `${selectedSongIds.size} song(s) selected (drag card to move group)`
-                : 'Click or drag selection box to select. Drag cards to move.'}
-            </Typography>
+            {selectedSongIds.size > 0 ? (
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                  {selectedSongIds.size} song(s) selected (drag card to move group)
+                </Typography>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => setSelectedSongIds(new Set())}
+                  sx={{ textTransform: 'none', py: 0.2, px: 1, minWidth: 'auto' }}
+                >
+                  Deselect All
+                </Button>
+              </Stack>
+            ) : (
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                Click or drag selection box to select. Drag cards to move.
+              </Typography>
+            )}
           </Box>
 
           {/* Song grid view */}
