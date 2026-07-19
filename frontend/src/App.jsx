@@ -1155,7 +1155,7 @@ function App() {
           />
         )}
         </Box>
-        <Box sx={{ display: { xs: 'none', lg: 'block' } }}>
+        <Box sx={{ display: { xs: 'none', lg: 'block' }, flexShrink: 0 }}>
           <ResizableSidebar initialWidth={500} minWidth={350} maxWidth={1000}>
             <PdfPreviewSidebar previewUrl={previewPdfUrl} isGenerating={isGeneratingPreview} />
           </ResizableSidebar>

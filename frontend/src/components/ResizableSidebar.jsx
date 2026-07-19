@@ -57,6 +57,7 @@ export default function ResizableSidebar({ children, initialWidth = 500, minWidt
         sx={{
           width: '16px',
           cursor: 'col-resize',
+          flexShrink: 0,
           bgcolor: 'transparent',
           display: 'flex',
           alignItems: 'center',
