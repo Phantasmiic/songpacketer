@@ -141,6 +141,19 @@ const SongBodyEditor = memo(function SongBodyEditor({
 
 
 
+const getSolidBg = (hexColor) => {
+  const colorMap = {
+    '#1976d2': '#f0f7ff', // Light Blue
+    '#2e7d32': '#f1fbf0', // Light Green
+    '#ed6c02': '#fff8eb', // Light Orange
+    '#9c27b0': '#fdf0ff', // Light Purple
+    '#d32f2f': '#fff1f1', // Light Red
+    '#00838f': '#e2fafd', // Light Cyan
+    '#455a64': '#f0f4f6', // Light Slate
+  };
+  return colorMap[hexColor] || '#fafafa';
+};
+
 function ReviewStep({
   matches,
   onSelectionChange,
@@ -248,7 +261,6 @@ function ReviewStep({
                   }}
                   sx={{
                     border: '1px solid #e0e0e0',
-                    borderLeft: `4px solid ${sectionColor}`,
                     borderRadius: 2,
                     p: 2,
                     outline: activeRowIndex === rowIndex ? `2px solid ${sectionColor}` : 'none',
@@ -508,7 +520,7 @@ function ReviewStep({
                     borderRadius: 2,
                     p: 2.5,
                     mt: 2.5,
-                    bgcolor: isSectionActive ? 'rgba(0, 0, 0, 0.015)' : 'rgba(0, 0, 0, 0.005)',
+                    bgcolor: getSolidBg(color),
                     outline: isSectionActive ? `2px solid ${color}` : 'none',
                     display: 'flex',
                     flexDirection: 'column',
