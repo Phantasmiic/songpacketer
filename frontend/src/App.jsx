@@ -989,8 +989,9 @@ function App() {
     }
   };
 
-  const unmatchedCount = matches.filter((row) => !row.selectedSongId).length;
-  const canProceedToGenerate = matches.length > 0 && unmatchedCount === 0;
+  const songMatches = matches.filter((row) => row.type !== 'section');
+  const unmatchedCount = songMatches.filter((row) => !row.selectedSongId).length;
+  const canProceedToGenerate = songMatches.length > 0 && unmatchedCount === 0;
   const activeVersionNumber = activePacket?.current_version?.version_number || activePacket?.latest_version_number || 1;
 
   return (
