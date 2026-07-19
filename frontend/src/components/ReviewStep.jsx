@@ -198,7 +198,7 @@ function ReviewStep({
   const hasRows = matches.length > 0;
   const rowRefs = useRef({});
   const [expandedEditors, setExpandedEditors] = useState({});
-  const [collapsedCards, setCollapsedCards] = useState({});
+  const [expandedCards, setExpandedCards] = useState({});
   const [addSectionOpen, setAddSectionOpen] = useState(false);
 
   const labelForRow = (row) => {
@@ -218,9 +218,9 @@ function ReviewStep({
     setExpandedEditors((prev) => ({ ...prev, [rowIndex]: !prev[rowIndex] }));
   };
 
-  const toggleCardCollapse = (rowIndex, e) => {
+  const toggleCardExpanded = (rowIndex, e) => {
     if (e) e.stopPropagation();
-    setCollapsedCards((prev) => ({ ...prev, [rowIndex]: !prev[rowIndex] }));
+    setExpandedCards((prev) => ({ ...prev, [rowIndex]: !prev[rowIndex] }));
   };
 
   const searchTermForRow = (row, rowIndex) => (
@@ -233,11 +233,8 @@ function ReviewStep({
   return (
     <Box
       sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: '1fr', md: '55% 45%' },
-        gap: 2,
+        width: '100%',
         minWidth: 0,
-        overflow: 'hidden',
       }}
     >
       <Paper elevation={2} sx={{ p: 3 }}>
@@ -308,7 +305,7 @@ function ReviewStep({
               }
 
               const isIndented = currentSection !== null;
-              const isCollapsed = collapsedCards[rowIndex];
+              const isExpanded = expandedCards[rowIndex];
               const currentSongNumber = songNumber++;
 
               return (
@@ -324,85 +321,73 @@ function ReviewStep({
                     borderRadius: 2,
                     p: 2,
                     outline: activeRowIndex === rowIndex ? '2px solid #0d47a1' : 'none',
-                    backgroundColor: '#fff'
+                    backgroundColor: '#fff',
+                    cursor: isExpanded ? 'default' : 'pointer',
+                    '&:hover': {
+                      backgroundColor: isExpanded ? '#fff' : '#f9f9f9',
+                    }
                   }}
-                  onClick={() => setActiveRowIndex(rowIndex)}
+                  onClick={() => {
+                    setActiveRowIndex(rowIndex);
+                    if (!isExpanded) {
+                      toggleCardExpanded(rowIndex);
+                    }
+                  }}
                 >
                   <Stack spacing={1.8}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        <Box
-                          sx={{
-                            display: 'inline-flex',
-                            alignSelf: 'flex-start',
-                            px: 1.5,
-                            py: 0.5,
-                            borderRadius: 99,
-                            bgcolor: '#eceff1',
-                            color: '#263238',
-                            fontWeight: 700,
-                            fontSize: '0.8rem',
-                          }}
-                        >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', flexGrow: 1 }}>
+                        <Typography sx={{ fontWeight: 700, color: 'text.secondary', minWidth: '60px' }}>
                           Song {currentSongNumber}
-                        </Box>
-                        <Box
-                          sx={{
-                            display: 'inline-flex',
-                            alignSelf: 'flex-start',
-                            px: 1.5,
-                            py: 0.5,
-                            borderRadius: 99,
-                            bgcolor: '#f3f4f6',
-                            color: '#374151',
-                            fontWeight: 700,
-                            fontSize: '0.8rem',
-                            maxWidth: '100%',
-                          }}
-                        >
-                          Input: {row.input}
-                        </Box>
+                        </Typography>
+                        
+                        <Typography sx={{ fontWeight: 600, color: row.selectedSongId ? 'text.primary' : 'error.main' }}>
+                          {labelForRow(row)}
+                        </Typography>
+
+                        {row.input && row.input.trim().toLowerCase() !== labelForRow(row).trim().toLowerCase() && (
+                          <Typography variant="body2" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                            (Input: "{row.input}")
+                          </Typography>
+                        )}
+
                         {!row.selectedSongId && (
-                          <Box
-                            sx={{
-                              display: 'inline-flex',
-                              alignSelf: 'flex-start',
-                              px: 1.5,
-                              py: 0.5,
-                              borderRadius: 99,
-                              bgcolor: '#ffebee',
-                              color: '#b71c1c',
-                              fontWeight: 700,
-                              fontSize: '0.8rem',
-                            }}
-                          >
+                          <Box sx={{ px: 1, py: 0.25, borderRadius: 1, bgcolor: '#ffebee', color: '#b71c1c', fontWeight: 700, fontSize: '0.75rem' }}>
                             No Match
                           </Box>
                         )}
-                        {row.selectedSongId && isCollapsed && (
-                          <Box
-                            sx={{
-                              display: 'inline-flex',
-                              alignSelf: 'flex-start',
-                              px: 1.5,
-                              py: 0.5,
-                              borderRadius: 99,
-                              bgcolor: '#e8f5e9',
-                              color: '#1b5e20',
-                              fontWeight: 700,
-                              fontSize: '0.8rem',
+                      </Box>
+                      
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {isExpanded ? (
+                          <Button 
+                            variant="text" 
+                            size="small" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleCardExpanded(rowIndex);
                             }}
+                            startIcon={<ExpandMoreIcon />}
                           >
-                            Matched
-                          </Box>
+                            Collapse
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="text" 
+                            size="small" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleCardExpanded(rowIndex);
+                            }}
+                            startIcon={<ChevronRightIcon />}
+                          >
+                            Edit
+                          </Button>
                         )}
                       </Box>
-                      <Button variant="text" size="small" onClick={(e) => toggleCardCollapse(rowIndex, e)}>
-                        {isCollapsed ? 'Expand' : 'Collapse'}
-                      </Button>
                     </Box>
 
-                    {!isCollapsed && (
+                    {isExpanded && (
                       <>
                         <SongSearchBox
                           initialValue={searchTermForRow(row, rowIndex)}
@@ -572,64 +557,7 @@ function ReviewStep({
         </Stack>
       </Paper>
 
-      <Paper elevation={2} sx={{ p: 2, height: 'fit-content', position: { md: 'sticky' }, top: { md: 148 } }}>
-        <Stack spacing={1}>
-          <Typography variant="subtitle1">Song List</Typography>
-          <Box sx={{ maxHeight: 520, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
-            {(() => {
-              let listSection = null;
-              let listSongNum = 1;
-              return matches.map((row, index) => {
-                if (row.type === 'section') {
-                  listSection = row.id || `sec-${index}`;
-                  return (
-                    <Box
-                      key={`list-sec-${index}`}
-                      sx={{
-                        px: 1.5,
-                        py: 1,
-                        borderBottom: '1px solid #f0f0f0',
-                        fontWeight: activeRowIndex === index ? 700 : 600,
-                        backgroundColor: activeRowIndex === index ? '#eef4ff' : '#f5f5f5',
-                        color: '#1a237e',
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => {
-                        setActiveRowIndex(index);
-                        scrollRowIntoCenter(index);
-                      }}
-                    >
-                      {row.title}
-                    </Box>
-                  );
-                }
-                const isIndented = listSection !== null;
-                return (
-                  <Box
-                    key={`${row.input}-list-${index}`}
-                    sx={{
-                      px: 1.5,
-                      py: 1,
-                      pl: isIndented ? 3.5 : 1.5,
-                      borderBottom: '1px solid #f0f0f0',
-                      borderLeft: isIndented ? '2px solid #c5cae9' : 'none',
-                      fontWeight: activeRowIndex === index ? 700 : 400,
-                      backgroundColor: activeRowIndex === index ? '#eef4ff' : 'transparent',
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => {
-                      setActiveRowIndex(index);
-                      scrollRowIntoCenter(index);
-                    }}
-                  >
-                    {listSongNum++}. {labelForRow(row)}
-                  </Box>
-                );
-              });
-            })()}
-          </Box>
-        </Stack>
-      </Paper>
+
 
       <AddSectionModal
         open={addSectionOpen}
