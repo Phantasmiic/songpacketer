@@ -98,6 +98,29 @@ export async function updateSongPacketState(packetId, state, eventType = '', sum
   return { success: true };
 }
 
+export async function updateSongPacketTitle(packetId, title) {
+  const db = await getDb();
+  const tx = db.transaction('packets', 'readwrite');
+  const store = tx.objectStore('packets');
+  const packet = await store.get(parseInt(packetId, 10));
+  
+  if (!packet) throw new Error('Packet not found');
+  
+  packet.title = title;
+  packet.updated_at = Date.now();
+  packet.history.push({
+    event_type: 'rename_packet',
+    summary: `Renamed packet to "${title}"`,
+    change: { title },
+    created_at: packet.updated_at,
+  });
+  
+  await store.put(packet);
+  await tx.done;
+  
+  return getSongPacket(packetId);
+}
+
 export async function saveSongPacketVersion(packetId, description = '', snapshot = null) {
   const db = await getDb();
   const tx = db.transaction('packets', 'readwrite');
@@ -179,4 +202,32 @@ export async function activateSongPacketVersion(packetId, versionId) {
   await tx.done;
   
   return getSongPacket(packetId);
+}
+
+export async function exportSongPacket(packetId) {
+  const db = await getDb();
+  const packet = await db.get('packets', parseInt(packetId, 10));
+  if (!packet) throw new Error('Packet not found');
+  return packet;
+}
+
+export async function importSongPacket(packetData) {
+  const db = await getDb();
+  const now = Date.now();
+  const packet = {
+    title: packetData.title || 'Imported Packet',
+    created_at: packetData.created_at || now,
+    updated_at: now,
+    current_state: packetData.current_state || {},
+    versions: Array.isArray(packetData.versions) ? packetData.versions : [],
+    history: Array.isArray(packetData.history) ? packetData.history : [{
+      event_type: 'import_packet',
+      summary: 'Imported packet from JSON file',
+      change: {},
+      created_at: now
+    }]
+  };
+  
+  const id = await db.add('packets', packet);
+  return getSongPacket(id);
 }

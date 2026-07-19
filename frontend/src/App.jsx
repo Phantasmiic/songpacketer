@@ -18,7 +18,11 @@ import {
   Stepper,
   TextField,
   Typography,
+  Popover,
+  Divider,
+  IconButton,
 } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
 
 import InputStep from './components/InputStep';
 import ReviewStep from './components/ReviewStep';
@@ -38,6 +42,9 @@ import {
   saveSongPacketVersion,
   syncSongbase,
   updateSongPacketState,
+  exportSongPacket,
+  importSongPacket,
+  updateSongPacketTitle,
 } from './api/client';
 
 const steps = ['Input', 'Refine', 'Generate'];
@@ -136,6 +143,7 @@ function App() {
   const { width: sidebarWidth, isResizing: sidebarResizing, startResize } = useResizableSidebar({ initialWidth: 500, minWidth: 350, maxWidth: 1000 });
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const previewTimerRef = useRef(null);
+  const importFileRef = useRef(null);
 
   useEffect(() => {
     return () => {
@@ -970,6 +978,60 @@ function App() {
     }
   };
 
+  const handleRenameActivePacket = async (newTitle) => {
+    if (!activePacket?.id || !newTitle.trim()) return;
+    try {
+      const payload = await updateSongPacketTitle(activePacket.id, newTitle.trim());
+      applyPacketPayload(payload, false); // Don't reload matching state, just update activePacket title info
+      await loadPacketList();
+    } catch (err) {
+      setError(err.message || 'Failed to rename packet.');
+    }
+  };
+
+  const handleExportPacket = async () => {
+    if (!activePacket?.id) return;
+    try {
+      const data = await exportSongPacket(activePacket.id);
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      downloadBlob(blob, `${activePacket.title.replace(/\s+/g, '_')}_packet.json`);
+      setToast('Packet exported successfully.');
+    } catch (err) {
+      setError(err.message || 'Failed to export packet.');
+    }
+  };
+
+  const handleImportPacket = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setLoading(true);
+    setError('');
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const packetData = JSON.parse(event.target.result);
+          const payload = await importSongPacket(packetData);
+          applyPacketPayload(payload, true);
+          await loadPacketList();
+          setToast('Packet imported successfully.');
+          setPacketMenuAnchor(null);
+        } catch (err) {
+          setError('Failed to parse or save imported JSON file.');
+        } finally {
+          setLoading(false);
+        }
+      };
+      reader.readAsText(file);
+    } catch (err) {
+      setError('Failed to read file.');
+      setLoading(false);
+    }
+    e.target.value = null;
+  };
+
   const handleActivatePacketVersion = async (versionId) => {
     if (!activePacket?.id) {
       return;
@@ -1108,21 +1170,180 @@ function App() {
         ) : null}
       </Paper>
 
-      <Menu
+      <Popover
         anchorEl={packetMenuAnchor}
         open={Boolean(packetMenuAnchor)}
         onClose={() => setPacketMenuAnchor(null)}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        PaperProps={{
+          sx: { width: 320, p: 2.5, borderRadius: 2, boxShadow: 3 }
+        }}
       >
-        {packetVersions.map((version) => (
-          <MenuItem
-            key={version.id}
-            onClick={() => handleActivatePacketVersion(version.id)}
-            selected={version.id === activePacket?.current_version?.id}
+        <Stack spacing={2}>
+          <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700 }}>
+            PACKET SETTINGS
+          </Typography>
+
+          <TextField
+            label="Packet Title"
+            size="small"
+            value={packetTitle}
+            onChange={(e) => {
+              setPacketTitle(e.target.value);
+              handleRenameActivePacket(e.target.value);
+            }}
+            fullWidth
+          />
+
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleExportPacket}
+              disabled={loading}
+              fullWidth
+              sx={{ textTransform: 'none' }}
+            >
+              Export JSON
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => importFileRef.current?.click()}
+              disabled={loading}
+              fullWidth
+              sx={{ textTransform: 'none' }}
+            >
+              Import JSON
+            </Button>
+            <input
+              type="file"
+              ref={importFileRef}
+              style={{ display: 'none' }}
+              onChange={handleImportPacket}
+              accept=".json"
+            />
+          </Stack>
+
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => {
+              setPacketMenuAnchor(null);
+              setSaveDialogOpen(true);
+            }}
+            disabled={loading}
+            fullWidth
+            sx={{ textTransform: 'none' }}
           >
-            v{version.version_number} {version.description ? `- ${version.description}` : ''}
-          </MenuItem>
-        ))}
-      </Menu>
+            Save New Version
+          </Button>
+
+          <Divider />
+
+          <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700 }}>
+            VERSION CHECKPOINTS ({packetVersions.length})
+          </Typography>
+
+          <Box sx={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1.5 }}>
+            {packetVersions.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 1.5, fontStyle: 'italic', textAlign: 'center' }}>
+                No versions saved yet.
+              </Typography>
+            ) : (
+              packetVersions.map((version) => {
+                const isCurrent = version.id === activePacket?.current_version?.id || 
+                  (activePacket && !activePacket.current_version && version.version_number === activeVersionNumber);
+                return (
+                  <Box
+                    key={version.id}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      px: 1.5,
+                      py: 1,
+                      borderBottom: '1px solid #f0f0f0',
+                      '&:last-child': { borderBottom: 'none' },
+                      bgcolor: isCurrent ? 'rgba(25, 118, 210, 0.04)' : 'transparent',
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: isCurrent ? 'rgba(25, 118, 210, 0.08)' : '#fcfcfc' },
+                    }}
+                    onClick={() => handleActivatePacketVersion(version.id)}
+                  >
+                    <Stack spacing={0.2} sx={{ minWidth: 0, flexGrow: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: isCurrent ? 700 : 500, color: isCurrent ? 'primary.main' : 'text.primary' }}>
+                        v{version.version_number}
+                      </Typography>
+                      {version.description && (
+                        <Typography variant="caption" color="text.secondary" noWrap>
+                          {version.description}
+                        </Typography>
+                      )}
+                    </Stack>
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleGenerateFromVersion(version.id);
+                      }}
+                      sx={{ p: 0.5 }}
+                    >
+                      <DownloadIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                );
+              })
+            )}
+          </Box>
+
+          <Divider />
+
+          <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700 }}>
+            SWITCH WORKSPACE
+          </Typography>
+
+          <TextField
+            select
+            label="Other local packets"
+            size="small"
+            value={activePacket?.id || ''}
+            onChange={async (e) => {
+              setPacketMenuAnchor(null);
+              const nextId = Number(e.target.value);
+              setSelectedPacketId(nextId);
+              setLoading(true);
+              setError('');
+              try {
+                const payload = await openLatestSongPacket(nextId);
+                applyPacketPayload(payload, true);
+                setPacketMode('existing');
+                setToast('Loaded packet.');
+                await loadPacketList();
+              } catch (err) {
+                setError(err.message || 'Failed to open packet.');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            fullWidth
+          >
+            {existingPackets.map((p) => (
+              <MenuItem key={p.id} value={p.id}>
+                {p.title}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Stack>
+      </Popover>
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }}>

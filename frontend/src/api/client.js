@@ -7,7 +7,10 @@ import {
   updateSongPacketState as dbUpdateSongPacketState,
   saveSongPacketVersion as dbSaveSongPacketVersion,
   openLatestSongPacket as dbOpenLatestSongPacket,
-  activateSongPacketVersion as dbActivateSongPacketVersion
+  activateSongPacketVersion as dbActivateSongPacketVersion,
+  exportSongPacket as dbExportSongPacket,
+  importSongPacket as dbImportSongPacket,
+  updateSongPacketTitle as dbUpdateSongPacketTitle
 } from '../db/packets';
 import { renderSongPacketPdf } from '../pdf/engine';
 
@@ -137,4 +140,16 @@ export async function generateSongPacketVersionPdf(packetId, versionId) {
     version.snapshot.show_section_headers_in_body ?? false,
     version.snapshot.show_section_headers_in_index ?? true
   );
+}
+
+export async function exportSongPacket(packetId) {
+  return await dbExportSongPacket(packetId);
+}
+
+export async function importSongPacket(packetData) {
+  return await dbImportSongPacket(packetData);
+}
+
+export async function updateSongPacketTitle(packetId, title) {
+  return await dbUpdateSongPacketTitle(packetId, title);
 }
