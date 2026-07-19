@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import SectionManagerDialog from './SectionManagerDialog';
 
 const SongSearchBox = memo(function SongSearchBox({
   initialValue,
@@ -138,50 +139,7 @@ const SongBodyEditor = memo(function SongBodyEditor({
   );
 });
 
-function AddSectionModal({ open, onClose, onAddSection }) {
-  const [title, setTitle] = useState('');
-  const [pastedText, setPastedText] = useState('');
 
-  const handleSubmit = () => {
-    onAddSection(title, pastedText);
-    setTitle('');
-    setPastedText('');
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Add Section</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            autoFocus
-            fullWidth
-            label="Section Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Sunday Morning Worship"
-          />
-          <TextField
-            fullWidth
-            multiline
-            minRows={4}
-            label="Paste songs (optional)"
-            value={pastedText}
-            onChange={(e) => setPastedText(e.target.value)}
-            placeholder="Paste song titles here, one per line, to auto-assign them to this section."
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={handleSubmit} disabled={!title.trim() && !pastedText.trim()}>
-          Add Section
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
 
 function ReviewStep({
   matches,
@@ -189,7 +147,7 @@ function ReviewStep({
   onSearchCandidates,
   onDeleteRow,
   onResetChordpro,
-  onAddSection,
+  onUpdateMatches,
   activeRowIndex,
   setActiveRowIndex,
   unmatchedCount,
@@ -199,7 +157,7 @@ function ReviewStep({
   const rowRefs = useRef({});
   const [expandedEditors, setExpandedEditors] = useState({});
   const [expandedCards, setExpandedCards] = useState({});
-  const [addSectionOpen, setAddSectionOpen] = useState(false);
+  const [sectionManagerOpen, setSectionManagerOpen] = useState(false);
 
   const labelForRow = (row) => {
     if (row.type === 'section') return row.title;
@@ -241,8 +199,8 @@ function ReviewStep({
         <Stack spacing={2}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography variant="h6">Refine Matches</Typography>
-            <Button variant="outlined" size="small" onClick={() => setAddSectionOpen(true)}>
-              + Add Section
+            <Button variant="outlined" size="small" onClick={() => setSectionManagerOpen(true)}>
+              Manage Sections
             </Button>
           </Stack>
           
@@ -559,10 +517,11 @@ function ReviewStep({
 
 
 
-      <AddSectionModal
-        open={addSectionOpen}
-        onClose={() => setAddSectionOpen(false)}
-        onAddSection={onAddSection}
+      <SectionManagerDialog
+        open={sectionManagerOpen}
+        onClose={() => setSectionManagerOpen(false)}
+        matches={matches}
+        onSave={onUpdateMatches}
       />
     </Box>
   );

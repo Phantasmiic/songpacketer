@@ -702,6 +702,34 @@ function App() {
     }
   };
 
+  const handleUpdateMatches = async (newMatches) => {
+    setLoading(true);
+    try {
+      const { finalRows, removedCount } = finalizeRefinedRows(newMatches);
+      setDuplicateRemovedCount(removedCount);
+      setMatches(finalRows);
+      setManualOrderCards([]);
+      setPacketStats(null);
+
+      const snapshot = buildPacketStateSnapshot({
+        matchesValue: finalRows,
+        manualCardsValue: [],
+        packetStatsValue: null,
+        stepValue: 1,
+        duplicateRemovedCountValue: removedCount,
+      });
+      await persistPacketState(snapshot, {
+        eventType: 'update_sections',
+        summary: 'Reorganized sections and songs',
+        change: { total_rows: finalRows.length },
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to update sections.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleResetChordpro = async (rowIndex) => {
     const copy = [...matches];
     copy[rowIndex] = {
@@ -1127,7 +1155,7 @@ function App() {
             onSearchCandidates={handleCandidateSearch}
             onDeleteRow={handleDeleteRow}
             onResetChordpro={handleResetChordpro}
-            onAddSection={handleAddSection}
+            onUpdateMatches={handleUpdateMatches}
             activeRowIndex={activeReviewRowIndex}
             setActiveRowIndex={setActiveReviewRowIndex}
             unmatchedCount={unmatchedCount}
