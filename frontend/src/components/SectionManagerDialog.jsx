@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -16,8 +16,10 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 
-const PRESET_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#00838f', '#455a64'];
+
+const PRESET_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#00838f', '#e91e63'];
 
 function createDragImage(count, firstSongTitle) {
   const container = document.createElement('div');
@@ -102,16 +104,42 @@ function createDragImage(count, firstSongTitle) {
   return container;
 }
 
-function CategoryItem({ id, title, color, count, isSelected, onClick, onDrop, onDelete, onRename }) {
+function CategoryItem({
+  id,
+  title,
+  color,
+  count,
+  isSelected,
+  onClick,
+  onDrop,
+  onDelete,
+  onRename,
+  draggable,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  isBeingDragged,
+  isCategoryDragging,
+}) {
   const [isDragOver, setIsDragOver] = useState(false);
   return (
     <Box
+      className="category-list-item"
+      data-id={id}
       onClick={onClick}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       onDragOver={(e) => {
         e.preventDefault();
+        if (onDragOver) onDragOver(e);
         setIsDragOver(true);
       }}
-      onDragLeave={() => setIsDragOver(false)}
+      onDragLeave={() => {
+        setIsDragOver(false);
+        if (onDragLeave) onDragLeave();
+      }}
       onDrop={(e) => {
         setIsDragOver(false);
         onDrop(e);
@@ -123,34 +151,39 @@ function CategoryItem({ id, title, color, count, isSelected, onClick, onDrop, on
         p: 1.25,
         borderRadius: 1.5,
         bgcolor: isSelected ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
-        border: isDragOver ? `2px dashed ${color || '#1976d2'}` : '2px solid transparent',
-        cursor: 'pointer',
-        transition: 'background-color 0.15s, border 0.15s',
+        // Visual dropzone indicators: dashed border only for song drops (none for category drag)
+        border: !isCategoryDragging && isDragOver ? `2px dashed ${color || '#1976d2'}` : '2px solid transparent',
+        cursor: 'grab',
+        opacity: isBeingDragged ? 0.4 : 1,
+        transition: 'background-color 0.15s, border 0.15s, opacity 0.15s',
         '&:hover': {
           bgcolor: isSelected ? 'rgba(25, 118, 210, 0.12)' : '#f0f0f0',
         },
       }}
     >
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flexGrow: 1 }}>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0, flexGrow: 1 }}>
+        <DragIndicatorIcon sx={{ color: 'text.disabled', fontSize: 18, cursor: 'grab', flexShrink: 0 }} />
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: color || '#757575', flexShrink: 0 }} />
         
         {isSelected && onRename ? (
-          <TextField
-            variant="standard"
-            value={title}
-            onChange={(e) => onRename(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.target.blur();
-              }
-            }}
-            placeholder="Untitled Section"
-            InputProps={{ disableUnderline: true, sx: { fontSize: '0.875rem', fontWeight: 700, color: 'primary.main', p: 0 } }}
-            size="small"
-            fullWidth
-            autoFocus
-          />
+          <Typography variant="body2" component="div" sx={{ minWidth: 0, flexGrow: 1 }}>
+            <TextField
+              variant="standard"
+              value={title}
+              onChange={(e) => onRename(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.target.blur();
+                }
+              }}
+              placeholder="Untitled Section"
+              InputProps={{ disableUnderline: true, sx: { fontSize: '0.875rem', fontWeight: 700, color: 'primary.main', p: 0 } }}
+              size="small"
+              fullWidth
+              autoFocus
+            />
+          </Typography>
         ) : (
           <Typography
             variant="body2"
@@ -203,6 +236,52 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
   const [selectedCategory, setSelectedCategory] = useState('unassigned');
   const [selectedSongIds, setSelectedSongIds] = useState(new Set());
   const [newSectionTitle, setNewSectionTitle] = useState('');
+  const [categoryOrder, setCategoryOrder] = useState([]);
+  const [draggedCategoryId, setDraggedCategoryId] = useState(null);
+  const [dragOverCategoryId, setDragOverCategoryId] = useState(null);
+  const [dropPosition, setDropPosition] = useState('top');
+
+  const oldRectsRef = useRef({});
+
+  useLayoutEffect(() => {
+    const oldRects = oldRectsRef.current;
+    if (!oldRects || Object.keys(oldRects).length === 0) return;
+
+    const containerEl = document.querySelector('.category-list-container');
+    if (!containerEl) return;
+
+    containerEl.querySelectorAll('.category-list-item').forEach((el) => {
+      const id = el.getAttribute('data-id');
+      const oldRect = oldRects[id];
+      if (id && oldRect) {
+        const newRect = el.getBoundingClientRect();
+        const deltaY = oldRect.top - newRect.top;
+        const deltaX = oldRect.left - newRect.left;
+
+        if (deltaY !== 0 || deltaX !== 0) {
+          // Invert: transform to starting position immediately
+          el.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+          el.style.transition = 'none';
+
+          // Play: animate back to origin
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              el.style.transform = '';
+              el.style.transition = 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)';
+              
+              // Clean up styles once transition completes
+              el.addEventListener('transitionend', () => {
+                el.style.transition = '';
+              }, { once: true });
+            });
+          });
+        }
+      }
+    });
+
+    // Clear old rects so it doesn't trigger on other updates
+    oldRectsRef.current = {};
+  }, [categoryOrder]);
 
   // Drag select marquee ref
   const rightPaneRef = useRef(null);
@@ -215,6 +294,7 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
 
     const sectionsList = [];
     const unassignedList = [];
+    const order = [];
     let currentSection = null;
 
     matches.forEach((item, index) => {
@@ -223,39 +303,65 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
       const rowWithId = { ...item, clientRowId };
 
       if (item.type === 'section') {
-        currentSection = {
-          id: clientRowId,
-          title: item.title,
-          color: PRESET_COLORS[sectionsList.length % PRESET_COLORS.length],
-          songs: [],
-        };
-        sectionsList.push(currentSection);
+        if (item.id === 'unassigned' || item.isUnassigned) {
+          currentSection = null;
+          if (!order.includes('unassigned')) {
+            order.push('unassigned');
+          }
+        } else {
+          currentSection = {
+            id: clientRowId,
+            title: item.title,
+            color: PRESET_COLORS[sectionsList.length % PRESET_COLORS.length],
+            songs: [],
+          };
+          sectionsList.push(currentSection);
+          order.push(clientRowId);
+        }
       } else {
         if (currentSection) {
           currentSection.songs.push(rowWithId);
         } else {
           unassignedList.push(rowWithId);
+          if (!order.includes('unassigned')) {
+            order.push('unassigned');
+          }
         }
       }
     });
+
+    if (!order.includes('unassigned')) {
+      order.unshift('unassigned');
+    }
 
     setSections(sectionsList);
     setUnassigned(unassignedList);
     setSelectedSongIds(new Set());
     setNewSectionTitle('');
     setSelectedCategory('unassigned');
+    setCategoryOrder(order);
   }, [open, matches]);
 
   const handleSave = () => {
     // Rebuild flat matches array
-    const flattened = [...unassigned.map(({ clientRowId, ...rest }) => rest)];
-    sections.forEach((sec) => {
-      // Save section header
-      flattened.push({ type: 'section', title: sec.title, id: sec.id });
-      // Save section songs
-      sec.songs.forEach(({ clientRowId, ...rest }) => {
-        flattened.push(rest);
-      });
+    const flattened = [];
+    categoryOrder.forEach((catId) => {
+      if (catId === 'unassigned') {
+        if (unassigned.length > 0) {
+          flattened.push({ type: 'section', title: 'Unassigned Songs', id: 'unassigned', isUnassigned: true });
+          unassigned.forEach(({ clientRowId, ...rest }) => {
+            flattened.push(rest);
+          });
+        }
+      } else {
+        const sec = sections.find((s) => s.id === catId);
+        if (sec) {
+          flattened.push({ type: 'section', title: sec.title, id: sec.id });
+          sec.songs.forEach(({ clientRowId, ...rest }) => {
+            flattened.push(rest);
+          });
+        }
+      }
     });
     onSave(flattened);
     onClose();
@@ -274,6 +380,7 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
     };
 
     setSections((prev) => [...prev, newSec]);
+    setCategoryOrder((prev) => [...prev, newSecId]);
     setNewSectionTitle('');
     setSelectedCategory(newSecId);
   };
@@ -287,6 +394,7 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
 
     // Remove section
     setSections((prev) => prev.filter((s) => s.id !== secId));
+    setCategoryOrder((prev) => prev.filter((id) => id !== secId));
 
     if (selectedCategory === secId) {
       setSelectedCategory('unassigned');
@@ -330,13 +438,70 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e) => {
+  const handleCategoryDragStart = (e, categoryId) => {
+    setDraggedCategoryId(categoryId);
+    e.dataTransfer.setData('text/category-id', categoryId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleCategoryDragEnd = () => {
+    setDraggedCategoryId(null);
+    setDragOverCategoryId(null);
+    setDropPosition('top');
+  };
+
+  const handleCategoryDragOver = (e, targetCategoryId) => {
     e.preventDefault();
+    if (draggedCategoryId && draggedCategoryId !== targetCategoryId) {
+      setDragOverCategoryId(targetCategoryId);
+      
+      const rect = e.currentTarget.getBoundingClientRect();
+      const relativeY = e.clientY - rect.top;
+      const position = relativeY > rect.height / 2 ? 'bottom' : 'top';
+      setDropPosition(position);
+    }
+  };
+
+  const captureCategoryRects = () => {
+    const containerEl = document.querySelector('.category-list-container');
+    const rects = {};
+    if (containerEl) {
+      containerEl.querySelectorAll('.category-list-item').forEach((el) => {
+        const id = el.getAttribute('data-id');
+        if (id) {
+          rects[id] = el.getBoundingClientRect();
+        }
+      });
+    }
+    oldRectsRef.current = rects;
   };
 
   const handleDrop = (e, targetCategory) => {
     e.preventDefault();
     try {
+      const draggedCatId = e.dataTransfer.getData('text/category-id');
+      if (draggedCatId) {
+        if (draggedCatId === targetCategory) return;
+        captureCategoryRects();
+        setCategoryOrder((prev) => {
+          const next = [...prev];
+          const draggedIdx = next.indexOf(draggedCatId);
+          if (draggedIdx !== -1) {
+            next.splice(draggedIdx, 1);
+            const targetIdx = next.indexOf(targetCategory);
+            if (targetIdx !== -1) {
+              const insertIdx = dropPosition === 'bottom' ? targetIdx + 1 : targetIdx;
+              next.splice(insertIdx, 0, draggedCatId);
+            }
+          }
+          return next;
+        });
+        setDraggedCategoryId(null);
+        setDragOverCategoryId(null);
+        setDropPosition('top');
+        return;
+      }
+
       const dataStr = e.dataTransfer.getData('application/json');
       if (!dataStr) return;
       const { dragIds, sourceCategory } = JSON.parse(dataStr);
@@ -505,60 +670,138 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
             </Stack>
           </Box>
 
-          <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
+          <Box
+            className="category-list-container"
+            sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}
+            onDragOver={(e) => {
+              e.preventDefault();
+            }}
+            onDragLeave={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              if (
+                e.clientX < rect.left ||
+                e.clientX >= rect.right ||
+                e.clientY < rect.top ||
+                e.clientY >= rect.bottom
+              ) {
+                setDragOverCategoryId(null);
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const draggedCatId = e.dataTransfer.getData('text/category-id');
+              if (draggedCatId && dragOverCategoryId) {
+                handleDrop(e, dragOverCategoryId);
+              }
+            }}
+          >
             <Stack spacing={1}>
               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, px: 1, mb: 0.5 }}>
-                SECTIONS
+                SECTIONS & ORDER
               </Typography>
               
-              {/* Sections list */}
-              {sections.map((sec) => (
-                <CategoryItem
-                  key={sec.id}
-                  id={sec.id}
-                  title={sec.title}
-                  color={sec.color}
-                  count={sec.songs.length}
-                  isSelected={selectedCategory === sec.id}
-                  onClick={() => {
-                    setSelectedCategory(sec.id);
-                    setSelectedSongIds(new Set());
-                  }}
-                  onDrop={(e) => handleDrop(e, sec.id)}
-                  onDelete={() => handleDeleteSection(sec.id)}
-                  onRename={(newTitle) => {
-                    setSections((prev) =>
-                      prev.map((s) => (s.id === sec.id ? { ...s, title: newTitle } : s))
-                    );
-                  }}
-                />
-              ))}
+               {categoryOrder.map((catId) => {
+                 const showTopIndicator = draggedCategoryId !== null && dragOverCategoryId === catId && draggedCategoryId !== catId && dropPosition === 'top';
+                 const showBottomIndicator = draggedCategoryId !== null && dragOverCategoryId === catId && draggedCategoryId !== catId && dropPosition === 'bottom';
+                 
+                 let itemElement = null;
+                 if (catId === 'unassigned') {
+                   itemElement = (
+                     <CategoryItem
+                       id="unassigned"
+                       title="Unassigned Songs"
+                       color="#757575"
+                       count={unassigned.length}
+                       isSelected={selectedCategory === 'unassigned'}
+                       onClick={() => {
+                         setSelectedCategory('unassigned');
+                         setSelectedSongIds(new Set());
+                       }}
+                       onDrop={(e) => handleDrop(e, 'unassigned')}
+                       draggable
+                       onDragStart={(e) => handleCategoryDragStart(e, 'unassigned')}
+                       onDragEnd={handleCategoryDragEnd}
+                       onDragOver={(e) => handleCategoryDragOver(e, 'unassigned')}
+                       isBeingDragged={draggedCategoryId === 'unassigned'}
+                       isCategoryDragging={draggedCategoryId !== null}
+                     />
+                   );
+                 } else {
+                   const sec = sections.find((s) => s.id === catId);
+                   if (sec) {
+                     itemElement = (
+                       <CategoryItem
+                         id={sec.id}
+                         title={sec.title}
+                         color={sec.color}
+                         count={sec.songs.length}
+                         isSelected={selectedCategory === sec.id}
+                         onClick={() => {
+                           setSelectedCategory(sec.id);
+                           setSelectedSongIds(new Set());
+                         }}
+                         onDrop={(e) => handleDrop(e, sec.id)}
+                         onDelete={() => handleDeleteSection(sec.id)}
+                         onRename={(newTitle) => {
+                           setSections((prev) =>
+                             prev.map((s) => (s.id === sec.id ? { ...s, title: newTitle } : s))
+                           );
+                         }}
+                         draggable
+                         onDragStart={(e) => handleCategoryDragStart(e, sec.id)}
+                         onDragEnd={handleCategoryDragEnd}
+                         onDragOver={(e) => handleCategoryDragOver(e, sec.id)}
+                         isBeingDragged={draggedCategoryId === sec.id}
+                         isCategoryDragging={draggedCategoryId !== null}
+                       />
+                     );
+                   }
+                 }
 
-              {sections.length === 0 && (
+                 return (
+                   <React.Fragment key={catId}>
+                     {showTopIndicator && (
+                       <Box
+                         sx={{
+                           height: 4,
+                           bgcolor: 'primary.main',
+                           borderRadius: 2,
+                           mx: 1,
+                           my: 0.5,
+                           animation: 'slideDown 0.12s ease-out',
+                           '@keyframes slideDown': {
+                             '0%': { height: 0, opacity: 0 },
+                             '100%': { height: 4, opacity: 1 },
+                           },
+                         }}
+                       />
+                     )}
+                     {itemElement}
+                     {showBottomIndicator && (
+                       <Box
+                         sx={{
+                           height: 4,
+                           bgcolor: 'primary.main',
+                           borderRadius: 2,
+                           mx: 1,
+                           my: 0.5,
+                           animation: 'slideDown 0.12s ease-out',
+                           '@keyframes slideDown': {
+                             '0%': { height: 0, opacity: 0 },
+                             '100%': { height: 4, opacity: 1 },
+                           },
+                         }}
+                       />
+                     )}
+                   </React.Fragment>
+                 );
+               })}
+
+              {categoryOrder.length === 0 && (
                 <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', px: 1, py: 1 }}>
                   No sections created yet. Add a section above.
                 </Typography>
               )}
-
-              <Divider sx={{ my: 1.5 }} />
-
-              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, px: 1, mb: 0.5 }}>
-                UNASSIGNED
-              </Typography>
-
-              {/* Unassigned category */}
-              <CategoryItem
-                id="unassigned"
-                title="Unassigned Songs"
-                color="#757575"
-                count={unassigned.length}
-                isSelected={selectedCategory === 'unassigned'}
-                onClick={() => {
-                  setSelectedCategory('unassigned');
-                  setSelectedSongIds(new Set());
-                }}
-                onDrop={(e) => handleDrop(e, 'unassigned')}
-              />
             </Stack>
           </Box>
         </Box>

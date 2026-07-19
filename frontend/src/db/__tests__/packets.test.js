@@ -31,6 +31,7 @@ vi.mock('../store', async () => {
   };
 });
 
+import { getDb } from '../store';
 import {
   createSongPacket,
   getSongPacket,
@@ -123,8 +124,8 @@ describe('saveSongPacketVersion', () => {
     const created = await createSongPacket('Snapshot Packet');
     const state = { matches: [{ input: 'Amazing Grace' }] };
     const result = await saveSongPacketVersion(created.packet.id, 'snap', state);
-    // We need to export raw to see snapshot field
-    const raw = await exportSongPacket(created.packet.id);
+    const db = await getDb();
+    const raw = await db.get('packets', created.packet.id);
     expect(raw.versions[0].snapshot).toEqual(state);
   });
 });
@@ -158,14 +159,12 @@ describe('activateSongPacketVersion', () => {
 });
 
 describe('exportSongPacket', () => {
-  it('returns raw packet data including versions array', async () => {
+  it('returns raw packet data without versions array', async () => {
     const created = await createSongPacket('Export Packet');
     await saveSongPacketVersion(created.packet.id, 'Draft', { key: 'val' });
     const raw = await exportSongPacket(created.packet.id);
     expect(raw.title).toBe('Export Packet');
-    expect(Array.isArray(raw.versions)).toBe(true);
-    expect(raw.versions).toHaveLength(1);
-    expect(raw.versions[0].snapshot).toEqual({ key: 'val' });
+    expect(raw.versions).toBeUndefined();
   });
 
   it('throws if packet is not found', async () => {

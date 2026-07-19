@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { getDb } from './db/store';
+import { CircularProgress } from '@mui/material';
 import {
   Alert,
   Box,
@@ -19,9 +21,15 @@ import {
   Divider,
   IconButton,
   Stack,
+  Tooltip,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import SettingsIcon from '@mui/icons-material/Settings';
+import SyncIcon from '@mui/icons-material/Sync';
+import InfoIcon from '@mui/icons-material/Info';
+
+
+
 
 import InputStep from './components/InputStep';
 import ReviewStep from './components/ReviewStep';
@@ -111,12 +119,40 @@ function removeDuplicateMatches(rows) {
   return { deduped, removedCount };
 }
 
+const formatLastSynced = (isoString) => {
+  if (!isoString) return 'Never';
+  const date = new Date(isoString);
+  const today = new Date();
+  const isToday = date.toDateString() === today.toDateString();
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) {
+    return `Today at ${timeStr}`;
+  }
+  const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return `${dateStr} at ${timeStr}`;
+};
+
 function App() {
   const [step, setStep] = useState(0);
   const [inputText, setInputText] = useState('');
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [initializing, setInitializing] = useState(true);
+  const [syncedCount, setSyncedCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState(localStorage.getItem('songpacketer_last_sync') || null);
+
+  const updateSyncedCount = async () => {
+    try {
+      const db = await getDb();
+      const count = await db.count('songs');
+      setSyncedCount(count);
+    } catch (err) {
+      console.error('Failed to update synced count:', err);
+    }
+  };
+
   const [toast, setToast] = useState('');
   const [maintainOriginalOrder, setMaintainOriginalOrder] = useState(false);
   const [activeReviewRowIndex, setActiveReviewRowIndex] = useState(0);
@@ -150,6 +186,35 @@ function App() {
       if (previewPdfUrl) window.URL.revokeObjectURL(previewPdfUrl);
     };
   }, [previewPdfUrl]);
+
+  // Initial sync check: if the local songs DB is empty, perform a one‑time sync and show a full‑screen loading overlay.
+  useEffect(() => {
+    if (import.meta.env?.MODE === 'test') {
+      setInitializing(false);
+      return;
+    }
+    async function initSync() {
+      try {
+        const db = await getDb();
+        const count = await db.count('songs');
+        if (count === 0) {
+          setSyncing(true);
+          await syncSongbase();
+          const now = new Date().toISOString();
+          localStorage.setItem('songpacketer_last_sync', now);
+          setLastSynced(now);
+        }
+        await updateSyncedCount();
+      } catch (e) {
+        console.error('Initial sync failed', e);
+        setError(e.message || 'Initial sync error');
+      } finally {
+        setSyncing(false);
+        setInitializing(false);
+      }
+    }
+    initSync();
+  }, []);
 
   const versionsCacheRef = useRef({});
 
@@ -256,12 +321,74 @@ function App() {
     ]);
   };
 
-  const hydrateFromPacketState = (state) => {
+  const hydrateFromPacketState = async (state) => {
     const nextState = state || {};
     const nextMatches = Array.isArray(nextState.matches) ? nextState.matches : [];
     setInputText(nextState.input_text || '');
-    setMatches(nextMatches);
-    primeVersionsCache(nextMatches);
+    
+    // Hydrate candidates and versions dynamically from IndexedDB if they are missing
+    const hydratedMatches = await Promise.all(
+      nextMatches.map(async (row) => {
+        if (row.type === 'section') return row;
+        
+        let candidates = row.candidates;
+        // Rebuild candidates list if missing or empty
+        if (!candidates || candidates.length === 0) {
+          const query = row.query || row.input;
+          if (query) {
+            try {
+              const data = await matchSongs('', [query]);
+              const matchResult = data.results?.[0];
+              if (matchResult?.candidates) {
+                // Ensure we prune candidate versions
+                candidates = matchResult.candidates.map(({ versions, ...cRest }) => cRest);
+              }
+            } catch (err) {
+              console.error('Failed to run dynamic match for row on hydration', query, err);
+            }
+          }
+        }
+        if (!candidates) candidates = [];
+
+        // Ensure currently selected song is in the candidates list
+        if (row.selectedSongId && !candidates.some(c => c.song_id === row.selectedSongId)) {
+          try {
+            const db = await getDb();
+            const song = await db.get('songs', parseInt(row.selectedSongId, 10));
+            if (song) {
+              candidates.unshift({
+                song_id: song.id,
+                title: song.title,
+                key: song.key,
+                preview: song.lyrics_plain?.substring(0, 100).replace(/\n/g, ' ') + '...',
+                score: 1.0,
+              });
+            }
+          } catch (err) {
+            console.error('Failed to pre-populate selected song in candidates list on hydration', err);
+          }
+        }
+
+        let versions = row.versions;
+        if (row.selectedSongId && (!versions || versions.length === 0)) {
+          try {
+            versions = await fetchVersionsCached(row.selectedSongId);
+          } catch (err) {
+            console.error('Failed to hydrate versions for song', row.selectedSongId, err);
+          }
+        }
+        if (!versions) versions = [];
+
+        return {
+          ...row,
+          candidates,
+          versions,
+        };
+      })
+    );
+
+    setMatches(hydratedMatches);
+    primeVersionsCache(hydratedMatches);
     setMaintainOriginalOrder(Boolean(nextState.maintain_original_order));
     setShowSectionHeadersInBody(nextState.show_section_headers_in_body ?? false);
     setShowSectionHeadersInIndex(nextState.show_section_headers_in_index ?? true);
@@ -269,7 +396,7 @@ function App() {
     setPacketStats(nextState.packet_stats || null);
     const nextStep = Number.isInteger(nextState.step)
       ? nextState.step
-      : nextMatches.length > 0
+      : hydratedMatches.length > 0
         ? 1
         : 0;
     setStep(nextStep);
@@ -292,6 +419,16 @@ function App() {
     }
   };
 
+  const cleanMatchesForSave = (matchesList) => {
+    return matchesList.map((row) => {
+      if (row.type === 'section') return row;
+      const cleanRowObj = { ...row };
+      delete cleanRowObj.versions;
+      delete cleanRowObj.candidates;
+      return cleanRowObj;
+    });
+  };
+
   const buildPacketStateSnapshot = ({
     inputTextValue = inputText,
     matchesValue = matches,
@@ -303,7 +440,8 @@ function App() {
     stepValue = step,
     duplicateRemovedCountValue = duplicateRemovedCount,
   } = {}) => {
-    const baseSelections = toSelections(matchesValue);
+    const cleanedMatches = cleanMatchesForSave(matchesValue);
+    const baseSelections = toSelections(cleanedMatches);
     const orderedSelections = manualCardsValue.length
       ? manualCardsValue
           .map((card) => {
@@ -325,7 +463,7 @@ function App() {
     return {
       packet_title: activePacket?.title || packetTitle.trim(),
       input_text: inputTextValue,
-      matches: matchesValue,
+      matches: cleanedMatches,
       maintain_original_order: maintainOrderValue,
       show_section_headers_in_body: showSectionHeadersInBodyValue,
       show_section_headers_in_index: showSectionHeadersInIndexValue,
@@ -455,15 +593,19 @@ function App() {
   };
 
   const handleSync = async () => {
-    setLoading(true);
+    setSyncing(true);
     setError('');
     try {
       const result = await syncSongbase();
       setToast(`Sync complete. Created: ${result.created}, Updated: ${result.updated}`);
+      const now = new Date().toISOString();
+      localStorage.setItem('songpacketer_last_sync', now);
+      setLastSynced(now);
+      await updateSyncedCount();
     } catch (err) {
-      setError(err.message || err.message || 'Song sync failed.');
+      setError(err.message || 'Song sync failed.');
     } finally {
-      setLoading(false);
+      setSyncing(false);
     }
   };
 
@@ -1085,6 +1227,32 @@ function App() {
   const canProceedToGenerate = songMatches.length > 0 && unmatchedCount === 0;
   const activeVersionNumber = activePacket?.current_version?.version_number || activePacket?.latest_version_number || 1;
 
+  if (initializing) {
+    return (
+      <Box
+        sx={{
+          position: 'fixed',
+          inset: 0,
+          bgcolor: 'rgba(0,0,0,0.85)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          zIndex: 9999,
+        }}
+      >
+        <CircularProgress color="inherit" size={60} sx={{ mb: 3 }} />
+        <Typography variant="h5" sx={{ fontWeight: 'medium', mb: 1 }}>
+          Syncing Songbase
+        </Typography>
+        <Typography variant="body1" color="grey.400">
+          This is a one-time setup to download the song library for offline search.
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Container maxWidth={false} sx={{ py: 2, maxWidth: 1600 }}>
       {/* ── Unified sticky nav bar ─────────────────────────────── */}
@@ -1189,19 +1357,6 @@ function App() {
           })}
         </Box>
 
-        {/* Contextual actions for step 0 */}
-        {step === 0 && (
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleSync}
-            disabled={loading}
-            sx={{ textTransform: 'none' }}
-          >
-            Sync Songs
-          </Button>
-        )}
-
         {/* Contextual forward action for step 1 */}
         {step === 1 && (
           <Button
@@ -1235,7 +1390,7 @@ function App() {
             size="small"
             disabled={loading}
             onClick={() => setSaveDialogOpen(true)}
-            sx={{ textTransform: 'none' }}
+            sx={{ textTransform: 'none', ml: 1 }}
           >
             Save Version
           </Button>
@@ -1245,9 +1400,109 @@ function App() {
           <Chip size="small" color="warning" label="Unsaved" sx={{ ml: 0.5 }} />
         ) : null}
 
+        {/* Spacer to push sync status and packet settings to the right */}
+        <Box sx={{ flexGrow: 1 }} />
+
+        {/* Constant sync status display */}
+        {/* Constant sync status display */}
+        <Tooltip
+          title={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 0.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: 'inherit', userSelect: 'none' }}>
+                {syncing ? 'Syncing...' : `Last synced: ${formatLastSynced(lastSynced)}`}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={handleSync}
+                disabled={syncing || loading}
+                title="Resync songs from Songbase"
+                sx={{
+                  p: 0.25,
+                  color: 'inherit',
+                  '&:hover': { color: 'primary.light' },
+                  animation: syncing ? 'spin 2s linear infinite' : 'none',
+                  '@keyframes spin': {
+                    '0%': { transform: 'rotate(0deg)' },
+                    '100%': { transform: 'rotate(360deg)' },
+                  },
+                }}
+              >
+                <SyncIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Box>
+          }
+          disableInteractive={false}
+          placement="bottom"
+          arrow
+          enterDelay={100}
+          leaveDelay={300}
+          slotProps={{
+            tooltip: {
+              sx: {
+                bgcolor: 'background.paper',
+                color: 'text.primary',
+                boxShadow: 3,
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2,
+                p: 0.75,
+              },
+            },
+            arrow: {
+              sx: {
+                color: 'background.paper',
+                '&::before': {
+                  border: '1px solid',
+                  borderColor: 'divider',
+                },
+              },
+            },
+          }}
+        >
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
+              bgcolor: 'action.selected',
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 16,
+              border: '1px solid',
+              borderColor: 'divider',
+              cursor: 'pointer',
+              userSelect: 'none',
+              mr: activePacket ? 1.5 : 0,
+              transition: 'background-color 0.2s',
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
+            }}
+          >
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: syncing ? 'warning.main' : syncedCount > 0 ? 'success.main' : 'error.main',
+                animation: syncing ? 'pulse 1.5s infinite' : 'none',
+                '@keyframes pulse': {
+                  '0%': { transform: 'scale(0.95)', opacity: 0.7 },
+                  '70%': { transform: 'scale(1)', opacity: 1 },
+                  '100%': { transform: 'scale(0.95)', opacity: 0.7 },
+                },
+              }}
+            />
+            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+              {syncing ? 'Syncing...' : `${syncedCount.toLocaleString()} songs synced`}
+            </Typography>
+            <InfoIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+          </Box>
+        </Tooltip>
+
         {/* Right: Manage Packet (shows packet name) */}
         {activePacket ? (
-          <Box sx={{ ml: 'auto', flexShrink: 0 }}>
+          <Box sx={{ flexShrink: 0 }}>
             <Button
               variant="contained"
               color="primary"

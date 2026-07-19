@@ -226,7 +226,6 @@ export async function matchSongs(inputText, queries = []) {
         key: song.key,
         preview: song.lyrics_plain.substring(0, 100).replace(/\n/g, ' ') + '...',
         score: res.score,
-        versions: song.versions,
       };
     });
 

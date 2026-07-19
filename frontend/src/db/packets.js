@@ -208,7 +208,26 @@ export async function exportSongPacket(packetId) {
   const db = await getDb();
   const packet = await db.get('packets', parseInt(packetId, 10));
   if (!packet) throw new Error('Packet not found');
-  return packet;
+
+  const cleanRow = (row) => {
+    if (row.type === 'section') return row;
+    const cleanRowObj = { ...row };
+    delete cleanRowObj.versions;
+    delete cleanRowObj.candidates;
+    return cleanRowObj;
+  };
+
+  const cleanMatches = (packet.current_state?.matches || []).map(cleanRow);
+
+  return {
+    title: packet.title,
+    created_at: packet.created_at,
+    updated_at: packet.updated_at,
+    current_state: {
+      ...packet.current_state,
+      matches: cleanMatches,
+    }
+  };
 }
 
 export async function importSongPacket(packetData) {

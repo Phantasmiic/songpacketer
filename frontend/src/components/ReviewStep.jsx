@@ -149,9 +149,9 @@ const getSolidBg = (hexColor) => {
     '#9c27b0': '#fdf0ff', // Light Purple
     '#d32f2f': '#fff1f1', // Light Red
     '#00838f': '#e2fafd', // Light Cyan
-    '#455a64': '#f0f4f6', // Light Slate
+    '#e91e63': '#fdf0f5', // Light Pink
   };
-  return colorMap[hexColor] || '#fafafa';
+  return colorMap[hexColor] || '#ffffff';
 };
 
 function ReviewStep({
@@ -228,7 +228,7 @@ function ReviewStep({
               Removed {duplicateRemovedCount} duplicate song occurrence(s) automatically (kept first occurrence).
             </Alert>
           )}          {hasRows && (() => {
-            const SECTION_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#00838f', '#455a64'];
+            const SECTION_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#00838f', '#e91e63'];
 
             // Group matches by section
             const groups = [];
@@ -236,14 +236,23 @@ function ReviewStep({
 
             matches.forEach((item, index) => {
               if (item.type === 'section') {
-                currentGroup = {
-                  type: 'section',
-                  id: item.id || `sec-${index}`,
-                  title: item.title,
-                  originalIndex: index,
-                  songs: [],
-                };
-                groups.push(currentGroup);
+                if (item.id === 'unassigned' || item.isUnassigned) {
+                  currentGroup = {
+                    type: 'unassigned',
+                    id: 'unassigned',
+                    songs: [],
+                  };
+                  groups.push(currentGroup);
+                } else {
+                  currentGroup = {
+                    type: 'section',
+                    id: item.id || `sec-${index}`,
+                    title: item.title,
+                    originalIndex: index,
+                    songs: [],
+                  };
+                  groups.push(currentGroup);
+                }
               } else {
                 if (groups.length === 0) {
                   groups.push(currentGroup);
@@ -499,17 +508,50 @@ function ReviewStep({
               );
             };
 
+            let sectionColorIndex = 0;
             return groups.map((group, groupIndex) => {
               if (group.type === 'unassigned') {
-                return group.songs.map((row) => {
-                  const rowIndex = row.originalIndex;
-                  const isExpanded = expandedCards[rowIndex];
-                  const currentSongNumber = songNumber++;
-                  return renderSongCard(row, rowIndex, currentSongNumber, isExpanded, '#757575');
-                });
+                const color = '#757575'; // Neutral gray color for unassigned
+                return (
+                  <Box
+                    key={group.id || `unassigned-${groupIndex}`}
+                    sx={{
+                      border: '1.5px solid #bdbdbd',
+                      borderRadius: 2,
+                      p: 2.5,
+                      mt: 2.5,
+                      bgcolor: '#f0f0f0', // Darker gray background
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                    }}
+                  >
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: color }} />
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                        Unassigned Songs
+                      </Typography>
+                    </Stack>
+
+                    <Stack spacing={1.8}>
+                      {group.songs.map((row) => {
+                        const rowIndex = row.originalIndex;
+                        const isExpanded = expandedCards[rowIndex];
+                        const currentSongNumber = songNumber++;
+                        return renderSongCard(row, rowIndex, currentSongNumber, isExpanded, color);
+                      })}
+                      {group.songs.length === 0 && (
+                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', pl: 3.5 }}>
+                          No unassigned songs.
+                        </Typography>
+                      )}
+                    </Stack>
+                  </Box>
+                );
               }
 
-              const color = SECTION_COLORS[(groupIndex - 1) % SECTION_COLORS.length];
+              const color = SECTION_COLORS[sectionColorIndex % SECTION_COLORS.length];
+              sectionColorIndex++;
               const isSectionActive = activeRowIndex === group.originalIndex;
 
               return (

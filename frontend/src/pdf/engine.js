@@ -62,7 +62,8 @@ export async function renderSongPacketPdf(
     capo: song.capo || 0,
     lines: chordproToLines(song.chordpro_override || song.chordpro_text || ''),
     force_new_page: song.force_new_page || false,
-    is_section: song.type === 'section'
+    is_section: song.type === 'section',
+    is_unassigned: song.type === 'section' && (song.id === 'unassigned' || song.isUnassigned)
   }));
 
   const vMargin = 72;
@@ -105,7 +106,7 @@ export async function renderSongPacketPdf(
   const entries = [];
   for (const idx of drawOrder) {
     const song = songsList[idx];
-    if (song.is_section && !showSectionHeadersInIndex) continue;
+    if (song.is_section && (!showSectionHeadersInIndex || song.is_unassigned)) continue;
     entries.push({ title: song.title, number: songNumberMap[idx], is_section: song.is_section });
   }
   
@@ -234,7 +235,7 @@ export async function renderSongPacketPdf(
     const { blocks, lineHeight: songLineHeight, fontSize: songFontSize, totalHeight: songHeight } = songLayout;
 
     if (song.is_section) {
-      if (!showSectionHeadersInBody) continue;
+      if (!showSectionHeadersInBody || song.is_unassigned) continue;
       
       if (cursor.y - bottom < songHeight) {
         if (cursor.col === 0) {
