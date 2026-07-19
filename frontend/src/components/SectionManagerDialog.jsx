@@ -466,6 +466,7 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
               />
               <Button
                 variant="contained"
+                size="small"
                 onClick={handleAddSection}
                 startIcon={<AddIcon />}
                 sx={{ height: 40, px: 2, flexShrink: 0 }}
@@ -618,7 +619,8 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
                       boxShadow: 'none',
                       transition: 'border 0.15s, background-color 0.15s',
                       userSelect: 'none',
-                      height: '80px',
+                      height: 'auto',
+                      minHeight: '80px',
                       display: 'flex',
                       alignItems: 'center',
                     }}
