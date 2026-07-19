@@ -6,7 +6,6 @@ import {
   Stack,
   TextField,
   Typography,
-  Grid,
   InputAdornment,
   List,
   ListItemButton,
@@ -185,8 +184,8 @@ function InputStep({
 
   return (
     <Box sx={{ maxWidth: 1000, mx: 'auto', mt: 2, px: 2 }}>
-      <Grid container spacing={2.5} justifyContent="center">
-        <Grid item xs={12} md={4}>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2.5} justifyContent="center">
+        <Box sx={{ flex: 1 }}>
           <Paper
             elevation={2}
             sx={{
@@ -216,9 +215,9 @@ function InputStep({
               </Typography>
             </Box>
           </Paper>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} md={4}>
+        <Box sx={{ flex: 1 }}>
           <Paper
             elevation={2}
             sx={{
@@ -248,9 +247,9 @@ function InputStep({
               </Typography>
             </Box>
           </Paper>
-        </Grid>
+        </Box>
 
-        <Grid item xs={12} md={4}>
+        <Box sx={{ flex: 1 }}>
           <Paper
             elevation={2}
             sx={{
@@ -290,8 +289,8 @@ function InputStep({
               onChange={handleFileChange}
             />
           </Paper>
-        </Grid>
-      </Grid>
+        </Box>
+      </Stack>
     </Box>
   );
 }
