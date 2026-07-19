@@ -19,7 +19,7 @@ import AddIcon from '@mui/icons-material/Add';
 
 const PRESET_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#00838f', '#455a64'];
 
-function createDragImage(count) {
+function createDragImage(count, firstSongTitle) {
   const container = document.createElement('div');
   container.style.position = 'absolute';
   container.style.top = '-1000px';
@@ -75,7 +75,7 @@ function createDragImage(count) {
   text.style.whiteSpace = 'nowrap';
   text.style.overflow = 'hidden';
   text.style.textOverflow = 'ellipsis';
-  text.innerText = 'Dragging songs';
+  text.innerText = firstSongTitle || 'Dragging songs';
   card1.appendChild(text);
   container.appendChild(card1);
 
@@ -286,7 +286,9 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
     }
     
     if (dragIds.length > 1) {
-      const dragImage = createDragImage(dragIds.length);
+      const firstSong = rightPaneSongs.find((s) => s.clientRowId === dragIds[0]);
+      const firstSongTitle = firstSong ? getSongTitle(firstSong) : 'Dragging songs';
+      const dragImage = createDragImage(dragIds.length, firstSongTitle);
       e.dataTransfer.setDragImage(dragImage, 10, 10);
       setTimeout(() => {
         if (dragImage.parentNode) {
