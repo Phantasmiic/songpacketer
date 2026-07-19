@@ -184,16 +184,7 @@ function InputStep({
   }
 
   return (
-    <Box sx={{ maxWidth: 960, mx: 'auto', mt: 4, px: 2 }}>
-      <Box sx={{ textAlign: 'center', mb: 6 }}>
-        <Typography variant="h3" sx={{ fontWeight: 800, mb: 1.5, background: 'linear-gradient(45deg, #1976d2, #9c27b0)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          Song Packeter
-        </Typography>
-        <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 400, maxWidth: 600, mx: 'auto' }}>
-          Transpose keys, manage song sections, and compile structured PDF songbooks client-side.
-        </Typography>
-      </Box>
-
+    <Box sx={{ maxWidth: 960, mx: 'auto', mt: 1, px: 2 }}>
       <Grid container spacing={3.5} justifyContent="center">
         <Grid item xs={12} sm={4}>
           <Paper
