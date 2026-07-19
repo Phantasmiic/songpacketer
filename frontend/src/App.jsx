@@ -24,6 +24,7 @@ import {
   Stack,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 import InputStep from './components/InputStep';
 import ReviewStep from './components/ReviewStep';
@@ -435,14 +436,15 @@ function App() {
     }
   };
 
-  const handleOpenExisting = async () => {
-    if (!selectedPacketId) {
+  const handleOpenExisting = async (packetId) => {
+    const idToOpen = packetId || selectedPacketId;
+    if (!idToOpen) {
       return;
     }
     setLoading(true);
     setError('');
     try {
-      const payload = await openLatestSongPacket(selectedPacketId);
+      const payload = await openLatestSongPacket(idToOpen);
       applyPacketPayload(payload, true);
       setPacketMode('existing');
       setToast('Loaded latest packet version.');
@@ -1161,12 +1163,15 @@ function App() {
 
         {activePacket ? (
           <Box sx={{ ml: 'auto' }}>
-            <Chip
-              color="info"
-              clickable
-              label={`${activePacket.title} · v${activeVersionNumber}`}
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<SettingsIcon />}
               onClick={(event) => setPacketMenuAnchor(event.currentTarget)}
-            />
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Manage Packet
+            </Button>
           </Box>
         ) : null}
       </Paper>
@@ -1356,17 +1361,14 @@ function App() {
         <Box sx={{ minWidth: 0, flexGrow: 1, mb: 2 }}>
         {step === 0 && (
           <InputStep
-            mode={packetMode}
-            setMode={setPacketMode}
             packetTitle={packetTitle}
             setPacketTitle={setPacketTitle}
             inputText={inputText}
             setInputText={setInputText}
             existingPackets={existingPackets}
-            selectedPacketId={selectedPacketId}
-            setSelectedPacketId={setSelectedPacketId}
-            onCreateAndMatch={handleCreateAndMatch}
             onOpenExisting={handleOpenExisting}
+            onCreateAndMatch={handleCreateAndMatch}
+            onImportPacket={handleImportPacket}
             loading={loading}
           />
         )}
