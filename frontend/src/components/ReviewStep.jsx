@@ -236,6 +236,8 @@ function ReviewStep({
         display: 'grid',
         gridTemplateColumns: { xs: '1fr', md: '55% 45%' },
         gap: 2,
+        minWidth: 0,
+        overflow: 'hidden',
       }}
     >
       <Paper elevation={2} sx={{ p: 3 }}>
