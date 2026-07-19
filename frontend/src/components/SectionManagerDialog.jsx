@@ -582,9 +582,9 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
               sx={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                gap: 2,
-                // Apply cursor style on the background for marquee selection
-                height: '100%',
+                gridAutoRows: 'max-content',
+                gap: 1.5,
+                alignContent: 'start',
                 minHeight: '100%',
                 cursor: 'crosshair',
               }}
