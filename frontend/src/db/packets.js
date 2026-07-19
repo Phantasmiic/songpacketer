@@ -126,7 +126,7 @@ export async function saveSongPacketVersion(packetId, description = '', snapshot
   await store.put(packet);
   await tx.done;
   
-  return { success: true };
+  return getSongPacket(packetId);
 }
 
 export async function openLatestSongPacket(packetId) {
@@ -149,6 +149,33 @@ export async function openLatestSongPacket(packetId) {
     });
     await store.put(packet);
   }
+  await tx.done;
+  
+  return getSongPacket(packetId);
+}
+
+export async function activateSongPacketVersion(packetId, versionId) {
+  const db = await getDb();
+  const tx = db.transaction('packets', 'readwrite');
+  const store = tx.objectStore('packets');
+  const packet = await store.get(parseInt(packetId, 10));
+  
+  if (!packet) throw new Error('Packet not found');
+  
+  const versionIdx = parseInt(versionId, 10) - 1;
+  const version = packet.versions[versionIdx];
+  if (!version) throw new Error('Version not found');
+  
+  packet.current_state = version.snapshot || {};
+  packet.updated_at = Date.now();
+  packet.history.push({
+    event_type: 'activate_version',
+    summary: `Switched to version ${versionId}`,
+    change: { version_number: versionId },
+    created_at: packet.updated_at,
+  });
+  
+  await store.put(packet);
   await tx.done;
   
   return getSongPacket(packetId);
