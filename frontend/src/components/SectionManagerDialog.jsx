@@ -19,6 +19,89 @@ import AddIcon from '@mui/icons-material/Add';
 
 const PRESET_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#00838f', '#455a64'];
 
+function createDragImage(count) {
+  const container = document.createElement('div');
+  container.style.position = 'absolute';
+  container.style.top = '-1000px';
+  container.style.left = '-1000px';
+  container.style.width = '120px';
+  container.style.height = '60px';
+  container.style.pointerEvents = 'none';
+
+  // Card layers to represent a stack
+  // Card 3 (back)
+  const card3 = document.createElement('div');
+  card3.style.position = 'absolute';
+  card3.style.top = '8px';
+  card3.style.left = '8px';
+  card3.style.width = '90px';
+  card3.style.height = '42px';
+  card3.style.backgroundColor = '#e0e0e0';
+  card3.style.border = '1px solid #bdbdbd';
+  card3.style.borderRadius = '6px';
+  card3.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+  container.appendChild(card3);
+
+  // Card 2 (middle)
+  const card2 = document.createElement('div');
+  card2.style.position = 'absolute';
+  card2.style.top = '4px';
+  card2.style.left = '4px';
+  card2.style.width = '90px';
+  card2.style.height = '42px';
+  card2.style.backgroundColor = '#f5f5f5';
+  card2.style.border = '1px solid #ccc';
+  card2.style.borderRadius = '6px';
+  card2.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+  container.appendChild(card2);
+
+  // Card 1 (top)
+  const card1 = document.createElement('div');
+  card1.style.position = 'absolute';
+  card1.style.top = '0';
+  card1.style.left = '0';
+  card1.style.width = '90px';
+  card1.style.height = '42px';
+  card1.style.backgroundColor = '#ffffff';
+  card1.style.border = '1.5px solid #1976d2';
+  card1.style.borderRadius = '6px';
+  card1.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+  
+  const text = document.createElement('div');
+  text.style.padding = '5px';
+  text.style.fontSize = '9px';
+  text.style.fontWeight = 'bold';
+  text.style.color = '#333';
+  text.style.whiteSpace = 'nowrap';
+  text.style.overflow = 'hidden';
+  text.style.textOverflow = 'ellipsis';
+  text.innerText = 'Dragging songs';
+  card1.appendChild(text);
+  container.appendChild(card1);
+
+  // Badge count
+  const badge = document.createElement('div');
+  badge.style.position = 'absolute';
+  badge.style.top = '-8px';
+  badge.style.right = '18px';
+  badge.style.minWidth = '20px';
+  badge.style.height = '20px';
+  badge.style.borderRadius = '10px';
+  badge.style.backgroundColor = '#d32f2f';
+  badge.style.color = '#ffffff';
+  badge.style.display = 'flex';
+  badge.style.alignItems = 'center';
+  badge.style.justifyContent = 'center';
+  badge.style.fontSize = '11px';
+  badge.style.fontWeight = 'bold';
+  badge.style.boxShadow = '0 1px 3px rgba(0,0,0,0.3)';
+  badge.innerText = count.toString();
+  container.appendChild(badge);
+
+  document.body.appendChild(container);
+  return container;
+}
+
 function CategoryItem({ id, title, color, count, isSelected, onClick, onDrop, onDelete }) {
   const [isDragOver, setIsDragOver] = useState(false);
   return (
@@ -200,6 +283,16 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
     let dragIds = [clientRowId];
     if (selectedSongIds.has(clientRowId)) {
       dragIds = Array.from(selectedSongIds);
+    }
+    
+    if (dragIds.length > 1) {
+      const dragImage = createDragImage(dragIds.length);
+      e.dataTransfer.setDragImage(dragImage, 10, 10);
+      setTimeout(() => {
+        if (dragImage.parentNode) {
+          dragImage.parentNode.removeChild(dragImage);
+        }
+      }, 0);
     }
     
     e.dataTransfer.setData('application/json', JSON.stringify({ dragIds, sourceCategory: selectedCategory }));
