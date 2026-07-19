@@ -214,58 +214,32 @@ function ReviewStep({
             <Alert severity="info">
               Removed {duplicateRemovedCount} duplicate song occurrence(s) automatically (kept first occurrence).
             </Alert>
-          )}
+          )}          {hasRows && (() => {
+            const SECTION_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#00838f', '#455a64'];
 
-          {hasRows &&
-            matches.map((row, rowIndex) => {
-              if (row.type === 'section') {
-                currentSection = row.id || `sec-${rowIndex}`;
-                return (
-                  <Box
-                    key={`sec-${rowIndex}`}
-                    ref={(element) => {
-                      rowRefs.current[rowIndex] = element;
-                    }}
-                    sx={{
-                      border: '1px solid #c5cae9',
-                      backgroundColor: '#e8eaf6',
-                      borderRadius: 2,
-                      p: 2,
-                      outline: activeRowIndex === rowIndex ? '2px solid #3f51b5' : 'none',
-                      mt: 2,
-                    }}
-                    onClick={() => setActiveRowIndex(rowIndex)}
-                  >
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <TextField
-                        variant="standard"
-                        value={row.title || ''}
-                        onChange={(e) => onSelectionChange(rowIndex, { title: e.target.value })}
-                        placeholder="Section Title"
-                        InputProps={{ disableUnderline: true, sx: { fontSize: '1.25rem', fontWeight: 600, color: '#1a237e' } }}
-                        fullWidth
-                      />
-                      <Button
-                        variant="text"
-                        color="error"
-                        size="small"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onDeleteRow(rowIndex);
-                        }}
-                        sx={{ minWidth: 'auto', ml: 2 }}
-                      >
-                        Delete
-                      </Button>
-                    </Stack>
-                  </Box>
-                );
+            // Group matches by section
+            const groups = [];
+            let currentGroup = { type: 'unassigned', songs: [] };
+
+            matches.forEach((item, index) => {
+              if (item.type === 'section') {
+                currentGroup = {
+                  type: 'section',
+                  id: item.id || `sec-${index}`,
+                  title: item.title,
+                  originalIndex: index,
+                  songs: [],
+                };
+                groups.push(currentGroup);
+              } else {
+                if (groups.length === 0) {
+                  groups.push(currentGroup);
+                }
+                currentGroup.songs.push({ ...item, originalIndex: index });
               }
+            });
 
-              const isIndented = currentSection !== null;
-              const isExpanded = expandedCards[rowIndex];
-              const currentSongNumber = songNumber++;
-
+            const renderSongCard = (row, rowIndex, currentSongNumber, isExpanded, sectionColor) => {
               return (
                 <Box
                   key={`${row.input}-${rowIndex}`}
@@ -274,18 +248,18 @@ function ReviewStep({
                   }}
                   sx={{
                     border: '1px solid #e0e0e0',
-                    borderLeft: isIndented ? '4px solid #3f51b5' : '1px solid #e0e0e0',
-                    marginLeft: isIndented ? 3 : 0,
+                    borderLeft: `4px solid ${sectionColor}`,
                     borderRadius: 2,
                     p: 2,
-                    outline: activeRowIndex === rowIndex ? '2px solid #0d47a1' : 'none',
+                    outline: activeRowIndex === rowIndex ? `2px solid ${sectionColor}` : 'none',
                     backgroundColor: '#fff',
                     cursor: isExpanded ? 'default' : 'pointer',
                     '&:hover': {
                       backgroundColor: isExpanded ? '#fff' : '#f9f9f9',
                     }
                   }}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setActiveRowIndex(rowIndex);
                     if (!isExpanded) {
                       toggleCardExpanded(rowIndex);
@@ -491,7 +465,7 @@ function ReviewStep({
                                   '&:hover': { textDecoration: 'underline' }
                                 }}
                               >
-                                Delete
+                                  Delete
                               </Typography>
                             </Box>
                           </Box>
@@ -511,7 +485,86 @@ function ReviewStep({
                   </Stack>
                 </Box>
               );
-            })}
+            };
+
+            return groups.map((group, groupIndex) => {
+              if (group.type === 'unassigned') {
+                return group.songs.map((row) => {
+                  const rowIndex = row.originalIndex;
+                  const isExpanded = expandedCards[rowIndex];
+                  const currentSongNumber = songNumber++;
+                  return renderSongCard(row, rowIndex, currentSongNumber, isExpanded, '#757575');
+                });
+              }
+
+              const color = SECTION_COLORS[(groupIndex - 1) % SECTION_COLORS.length];
+              const isSectionActive = activeRowIndex === group.originalIndex;
+
+              return (
+                <Box
+                  key={group.id}
+                  sx={{
+                    border: `1.5px solid ${color}`,
+                    borderRadius: 2,
+                    p: 2.5,
+                    mt: 2.5,
+                    bgcolor: isSectionActive ? 'rgba(0, 0, 0, 0.015)' : 'rgba(0, 0, 0, 0.005)',
+                    outline: isSectionActive ? `2px solid ${color}` : 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2,
+                  }}
+                  onClick={() => {
+                    setActiveRowIndex(group.originalIndex);
+                  }}
+                >
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexGrow: 1 }}>
+                      <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: color }} />
+                      <TextField
+                        variant="standard"
+                        value={group.title || ''}
+                        onChange={(e) => onSelectionChange(group.originalIndex, { title: e.target.value })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveRowIndex(group.originalIndex);
+                        }}
+                        placeholder="Untitled Section"
+                        InputProps={{ disableUnderline: true, sx: { fontSize: '1.15rem', fontWeight: 700, color: color } }}
+                        fullWidth
+                      />
+                    </Stack>
+                    <Button
+                      variant="text"
+                      color="error"
+                      size="small"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDeleteRow(group.originalIndex);
+                      }}
+                      sx={{ minWidth: 'auto', ml: 2 }}
+                    >
+                      Delete Section
+                    </Button>
+                  </Stack>
+
+                  <Stack spacing={1.8}>
+                    {group.songs.map((row) => {
+                      const rowIndex = row.originalIndex;
+                      const isExpanded = expandedCards[rowIndex];
+                      const currentSongNumber = songNumber++;
+                      return renderSongCard(row, rowIndex, currentSongNumber, isExpanded, color);
+                    })}
+                    {group.songs.length === 0 && (
+                      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', pl: 3.5 }}>
+                        Empty section. Manage sections to assign songs here.
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+              );
+            });
+          })()}
         </Stack>
       </Paper>
 
