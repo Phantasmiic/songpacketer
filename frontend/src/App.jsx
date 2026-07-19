@@ -13,8 +13,6 @@ import {
   MenuItem,
   Paper,
   Snackbar,
-  Tab,
-  Tabs,
   TextField,
   Typography,
   Popover,
@@ -1113,37 +1111,93 @@ function App() {
           Song Packeter
         </Typography>
 
-        {/* Centre: tab nav — always rendered so the bar has consistent height */}
-        <Tabs
-          value={step}
-          onChange={(_, newVal) => {
-            // Back nav is always free; forward nav is gated
-            if (newVal < step) { setStep(newVal); return; }
-            if (newVal === 1 && step === 0 && activePacket) { setStep(1); return; }
-            if (newVal === 2 && canProceedToGenerate) { setStep(2); return; }
-          }}
-          sx={{
-            minHeight: 40,
-            '& .MuiTab-root': {
-              minHeight: 40,
-              py: 0.5,
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-            },
-          }}
-        >
-          {steps.map((label, idx) => (
-            <Tab
-              key={label}
-              label={label}
-              disabled={
-                (idx === 1 && !activePacket) ||
-                (idx === 2 && !canProceedToGenerate)
-              }
-            />
-          ))}
-        </Tabs>
+        {/* Centre: inline step indicator */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+          {steps.map((label, idx) => {
+            const isActive = step === idx;
+            const isCompleted = step > idx;
+            const isDisabled =
+              (idx === 1 && !activePacket) ||
+              (idx === 2 && !canProceedToGenerate);
+            const canClick =
+              !isDisabled &&
+              (idx < step || (idx === step + 1 && !isDisabled));
+
+            return (
+              <Box key={label} sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box
+                  onClick={() => {
+                    if (isDisabled) return;
+                    if (idx < step) { setStep(idx); return; }
+                    if (idx === 1 && step === 0 && activePacket) { setStep(1); return; }
+                    if (idx === 2 && canProceedToGenerate) { setStep(2); return; }
+                  }}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.75,
+                    px: 1.25,
+                    py: 0.5,
+                    borderRadius: 1.5,
+                    cursor: isDisabled ? 'default' : 'pointer',
+                    transition: 'background 0.15s',
+                    bgcolor: isActive ? 'primary.main' : 'transparent',
+                    '&:hover': !isDisabled ? {
+                      bgcolor: isActive ? 'primary.dark' : 'action.hover',
+                    } : {},
+                  }}
+                >
+                  {/* Step number circle */}
+                  <Box
+                    sx={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      flexShrink: 0,
+                      bgcolor: isActive
+                        ? 'white'
+                        : isCompleted
+                        ? 'success.main'
+                        : isDisabled
+                        ? 'action.disabled'
+                        : 'primary.main',
+                      color: isActive
+                        ? 'primary.main'
+                        : isCompleted || !isDisabled
+                        ? 'white'
+                        : 'text.disabled',
+                    }}
+                  >
+                    {isCompleted ? '✓' : idx + 1}
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: isActive ? 700 : 500,
+                      fontSize: '0.825rem',
+                      color: isActive
+                        ? 'white'
+                        : isDisabled
+                        ? 'text.disabled'
+                        : 'text.primary',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {label}
+                  </Typography>
+                </Box>
+                {idx < steps.length - 1 && (
+                  <Typography sx={{ color: 'text.disabled', fontSize: '1rem', mx: 0.25, userSelect: 'none' }}>›</Typography>
+                )}
+              </Box>
+            );
+          })}
+        </Box>
 
         {/* Contextual actions for step 0 */}
         {step === 0 && (
