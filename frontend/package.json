@@ -16,6 +16,7 @@
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
     "@pdf-lib/fontkit": "^1.1.1",
+    "diff-match-patch": "^1.0.5",
     "fuzzysort": "^3.1.0",
     "idb": "^8.0.3",
     "pdf-lib": "^1.17.1",

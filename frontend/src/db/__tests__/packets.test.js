@@ -233,3 +233,62 @@ describe('importSongPacket', () => {
     expect(songMatch.defaultChordpro.trim()).toBe('1\nVerse 1');
   });
 });
+
+describe('exportSongPacket and importSongPacket with patches', () => {
+  it('shrinks json size by exporting a patch and restores the exact override on import', async () => {
+    const initialState = {
+      matches: [
+        {
+          type: 'song',
+          defaultChordpro: '1\nVerse 1\nLine 1\nLine 2',
+          chordproOverride: '1\nVerse 1\nLine 1\nLine 2 modified'
+        }
+      ]
+    };
+    const created = await createSongPacket('Patch Test Packet', initialState);
+    
+    const exported = await exportSongPacket(created.packet.id);
+    const exportedSong = exported.current_state.matches[0];
+    
+    // It should have deleted the full override and saved a patch
+    expect(exportedSong.chordproOverride).toBeUndefined();
+    expect(typeof exportedSong.chordproPatchText).toBe('string');
+    
+    // The patch text should be smaller than the full string (for small changes in large strings, but here it's small so let's just check it exists)
+    expect(exportedSong.chordproPatchText.length).toBeGreaterThan(0);
+    
+    const imported = await importSongPacket(exported);
+    const importedSong = imported.state.matches[0];
+    
+    // It should have restored the exact override
+    expect(importedSong.chordproOverride).toBe('1\nVerse 1\nLine 1\nLine 2 modified');
+    // And it should have cleaned up the patch text
+    expect(importedSong.chordproPatchText).toBeUndefined();
+  });
+
+  it('restores default chordpro correctly when there is no patch (unmodified song)', async () => {
+    const initialState = {
+      matches: [
+        {
+          type: 'song',
+          defaultChordpro: '1\nVerse 1\nUnmodified',
+          chordproOverride: '1\nVerse 1\nUnmodified'
+        }
+      ]
+    };
+    const created = await createSongPacket('No Patch Test Packet', initialState);
+    
+    const exported = await exportSongPacket(created.packet.id);
+    const exportedSong = exported.current_state.matches[0];
+    
+    // It should have deleted the override and not created a patch
+    expect(exportedSong.chordproOverride).toBeUndefined();
+    expect(exportedSong.chordproPatchText).toBeUndefined();
+    
+    const imported = await importSongPacket(exported);
+    const importedSong = imported.state.matches[0];
+    
+    // It should have safely restored the override to match the default
+    expect(importedSong.chordproOverride).toBe('1\nVerse 1\nUnmodified');
+  });
+});

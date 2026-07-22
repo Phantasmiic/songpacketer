@@ -1,4 +1,7 @@
+import { diff_match_patch } from 'diff-match-patch';
 import { getDb } from './store';
+
+const dmp = new diff_match_patch();
 
 export async function listSongPackets() {
   const db = await getDb();
@@ -214,6 +217,18 @@ export async function exportSongPacket(packetId) {
     const cleanRowObj = { ...row };
     delete cleanRowObj.versions;
     delete cleanRowObj.candidates;
+
+    if (cleanRowObj.type === 'song') {
+      const defaultChordpro = cleanRowObj.defaultChordpro || '';
+      const currentChordpro = cleanRowObj.chordproOverride || '';
+      
+      if (defaultChordpro !== currentChordpro) {
+        const patches = dmp.patch_make(defaultChordpro, currentChordpro);
+        cleanRowObj.chordproPatchText = dmp.patch_toText(patches);
+      }
+      delete cleanRowObj.chordproOverride;
+    }
+
     return cleanRowObj;
   };
 
@@ -248,11 +263,25 @@ export async function importSongPacket(packetData) {
   if (Array.isArray(safeCurrentState.matches)) {
     safeCurrentState.matches = safeCurrentState.matches.map(m => {
       if (m.type === 'song') {
-        return {
+        let chordproOverride = m.chordproOverride;
+        const defaultChordpro = sanitizeChordpro(m.defaultChordpro);
+        
+        if (m.chordproPatchText) {
+          const patches = dmp.patch_fromText(m.chordproPatchText);
+          const [patchedText] = dmp.patch_apply(patches, defaultChordpro || '');
+          chordproOverride = patchedText;
+        } else if (chordproOverride === undefined) {
+          // If there is no patch and chordproOverride is missing, it means it was completely identical to defaultChordpro
+          chordproOverride = defaultChordpro;
+        }
+
+        const cleanM = {
           ...m,
-          chordproOverride: sanitizeChordpro(m.chordproOverride),
-          defaultChordpro: sanitizeChordpro(m.defaultChordpro)
+          chordproOverride: sanitizeChordpro(chordproOverride),
+          defaultChordpro: defaultChordpro
         };
+        delete cleanM.chordproPatchText;
+        return cleanM;
       }
       return m;
     });

@@ -52,18 +52,81 @@ export default function PresentationHome({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const filteredSongs = numberedSongs.filter(song => {
-    if (song.type === 'section') {
-      return showHeaders;
-    }
-    if (!searchTerm.trim()) return true;
+  const filteredSongs = useMemo(() => {
+    return numberedSongs.filter(song => {
+      if (song.type === 'section') {
+        return showHeaders;
+      }
+      if (!searchTerm.trim()) return true;
 
-    const searchLower = searchTerm.toLowerCase();
-    const title = (song.title_override || song.title || song.input_text || song.input || '').toLowerCase();
-    const lyrics = (song.chordpro_override || song.chordpro_text || song.lyrics || '').toLowerCase();
-    const numStr = String(song.songNumber || '');
-    return title.includes(searchLower) || lyrics.includes(searchLower) || numStr === searchLower;
-  });
+      const searchLower = searchTerm.toLowerCase();
+      const title = (song.title_override || song.title || song.input_text || song.input || '').toLowerCase();
+      const lyrics = (song.chordpro_override || song.chordpro_text || song.lyrics || '').toLowerCase();
+      const numStr = String(song.songNumber || '');
+      return title.includes(searchLower) || lyrics.includes(searchLower) || numStr === searchLower;
+    });
+  }, [numberedSongs, showHeaders, searchTerm]);
+
+  // Group filtered songs into sections for column rendering
+  const sectionGroups = useMemo(() => {
+    const groups = [];
+    let currentGroup = { header: null, songs: [] };
+
+    filteredSongs.forEach((item) => {
+      if (item.type === 'section') {
+        if (currentGroup.header || currentGroup.songs.length > 0) {
+          groups.push(currentGroup);
+        }
+        currentGroup = { header: item, songs: [] };
+      } else {
+        currentGroup.songs.push(item);
+      }
+    });
+
+    if (currentGroup.header || currentGroup.songs.length > 0) {
+      groups.push(currentGroup);
+    }
+
+    return groups;
+  }, [filteredSongs]);
+
+  const renderSongItem = (item, index) => {
+    const title = item.title_override || item.title || item.input_text || item.input || 'Untitled Song';
+    const songNum = item.songNumber;
+
+    return (
+      <ListItemButton 
+        key={`song-${item.song_id || item.id || index}`} 
+        onClick={() => onSelectSong(item)}
+        sx={{ 
+          py: 1.5, 
+          px: 3,
+          borderRadius: 1.5,
+          transition: 'background-color 0.2s',
+          '&:hover': { bgcolor: itemHoverBgColor } 
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              width: 48, 
+              fontWeight: 700, 
+              color: accentColor,
+              opacity: 0.9,
+              fontFamily: 'monospace' 
+            }}
+          >
+            {songNum}.
+          </Typography>
+          <ListItemText 
+            primary={title} 
+            primaryTypographyProps={{ fontSize: '1.25rem', fontWeight: 500, color: textColor }} 
+          />
+        </Box>
+      </ListItemButton>
+    );
+  };
 
   return (
     <Box sx={{
@@ -136,70 +199,51 @@ export default function PresentationHome({
               p: 3
             }} 
           >
-          <List disablePadding sx={{ 
-            display: 'grid', 
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, 
-            columnGap: 4,
-            rowGap: 0.5
-          }}>
-            {filteredSongs.map((item, index) => {
-              if (item.type === 'section') {
-                return (
-                  <Box key={`section-${index}`} sx={{ gridColumn: '1 / -1', mt: index > 0 ? 2 : 0, mb: 1 }}>
-                    {index > 0 && <Divider sx={{ borderColor: borderColor }} />}
-                    <ListItem sx={{ bgcolor: 'rgba(127, 127, 127, 0.1)', py: 1.5, borderRadius: 1 }}>
-                      <ListItemText 
-                        primary={item.title} 
-                        primaryTypographyProps={{ variant: 'h6', fontWeight: 'bold', color: accentColor, letterSpacing: 1 }} 
-                      />
-                    </ListItem>
-                  </Box>
-                );
-              }
-              
-              const title = item.title_override || item.title || item.input_text || item.input || 'Untitled Song';
-              const songNum = item.songNumber;
+            <List disablePadding>
+              {sectionGroups.map((group, groupIdx) => {
+                const mid = Math.ceil(group.songs.length / 2);
+                const leftSongs = group.songs.slice(0, mid);
+                const rightSongs = group.songs.slice(mid);
 
-              return (
-                <ListItemButton 
-                  key={`song-${item.song_id || index}`} 
-                  onClick={() => onSelectSong(item)}
-                  sx={{ 
-                    py: 1.5, 
-                    px: 3,
-                    borderRadius: 1.5,
-                    transition: 'background-color 0.2s',
-                    '&:hover': { bgcolor: itemHoverBgColor } 
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                    <Typography 
-                      variant="h6" 
+                return (
+                  <Box key={`group-${groupIdx}`} sx={{ mb: groupIdx < sectionGroups.length - 1 ? 3 : 0 }}>
+                    {group.header && (
+                      <Box sx={{ mb: 2 }}>
+                        {groupIdx > 0 && <Divider sx={{ borderColor: borderColor, mb: 2 }} />}
+                        <ListItem sx={{ bgcolor: 'rgba(127, 127, 127, 0.1)', py: 1.5, borderRadius: 1 }}>
+                          <ListItemText 
+                            primary={group.header.title} 
+                            primaryTypographyProps={{ variant: 'h6', fontWeight: 'bold', color: accentColor, letterSpacing: 1 }} 
+                          />
+                        </ListItem>
+                      </Box>
+                    )}
+                    <Box 
                       sx={{ 
-                        width: 48, 
-                        fontWeight: 700, 
-                        color: accentColor,
-                        opacity: 0.9,
-                        fontFamily: 'monospace' 
+                        display: 'grid', 
+                        gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, 
+                        columnGap: 4, 
+                        alignItems: 'start' 
                       }}
                     >
-                      {songNum}.
-                    </Typography>
-                    <ListItemText 
-                      primary={title} 
-                      primaryTypographyProps={{ fontSize: '1.25rem', fontWeight: 500, color: textColor }} 
-                    />
+                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                        {leftSongs.map((song, i) => renderSongItem(song, i))}
+                      </Box>
+                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                        {rightSongs.map((song, i) => renderSongItem(song, i))}
+                      </Box>
+                    </Box>
                   </Box>
-                </ListItemButton>
-              );
-            })}
-            {filteredSongs.length === 0 && (
-              <Box sx={{ p: 6, textAlign: 'center', gridColumn: '1 / -1' }}>
-                <Typography color="text.secondary" variant="h6">No songs found.</Typography>
-              </Box>
-            )}
-          </List>
-        </Paper>
+                );
+              })}
+
+              {filteredSongs.length === 0 && (
+                <Box sx={{ p: 6, textAlign: 'center' }}>
+                  <Typography color="text.secondary" variant="h6">No songs found.</Typography>
+                </Box>
+              )}
+            </List>
+          </Paper>
         </Box>
       </Box>
     </Box>
