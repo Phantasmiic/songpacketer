@@ -3,6 +3,10 @@
     {
       "source": "/api/songbase/:match*",
       "destination": "https://songbase.life/api/v2/:match*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

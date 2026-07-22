@@ -27,14 +27,14 @@ import DownloadIcon from '@mui/icons-material/Download';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SyncIcon from '@mui/icons-material/Sync';
 import InfoIcon from '@mui/icons-material/Info';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
-
-
-
+import PresentationMode from './presentation/PresentationMode';
 import InputStep from './components/InputStep';
 import ReviewStep from './components/ReviewStep';
 import GenerateStep from './components/GenerateStep';
 import PdfPreviewSidebar from './components/PdfPreviewSidebar';
+import ReloadPrompt from './components/ReloadPrompt';
 import { useResizableSidebar, ResizeHandle, ResizableSidebarPanel } from './components/ResizableSidebar';
 import {
   activateSongPacketVersion,
@@ -177,6 +177,33 @@ function App() {
   const [previewPdfUrl, setPreviewPdfUrl] = useState(null);
   const { width: sidebarWidth, isResizing: sidebarResizing, startResize } = useResizableSidebar({ initialWidth: 500, minWidth: 350, maxWidth: 1000 });
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [isPresentationMode, setIsPresentationMode] = useState(() => {
+    if (window.location.pathname.startsWith('/present')) return true;
+    return localStorage.getItem('presentationActive') === 'true';
+  });
+
+  useEffect(() => {
+    // Save to local storage
+    localStorage.setItem('presentationActive', isPresentationMode ? 'true' : 'false');
+    
+    // Sync state to URL
+    const path = window.location.pathname;
+    if (isPresentationMode && path === '/') {
+      window.history.pushState({}, '', '/present');
+    } else if (!isPresentationMode && path.startsWith('/present')) {
+      window.history.pushState({}, '', '/');
+    }
+  }, [isPresentationMode]);
+
+  // Handle Browser Back/Forward
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsPresentationMode(window.location.pathname.startsWith('/present'));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const previewTimerRef = useRef(null);
   const importFileRef = useRef(null);
 
@@ -1502,7 +1529,17 @@ function App() {
 
         {/* Right: Manage Packet (shows packet name) */}
         {activePacket ? (
-          <Box sx={{ flexShrink: 0 }}>
+          <Box sx={{ flexShrink: 0, display: 'flex', gap: 1 }}>
+            <Button
+              variant="contained"
+              color="secondary"
+              size="small"
+              startIcon={<PlayArrowIcon />}
+              onClick={() => setIsPresentationMode(true)}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Present
+            </Button>
             <Button
               variant="contained"
               color="primary"
@@ -1788,6 +1825,15 @@ function App() {
         onClose={() => setToast('')}
         message={toast}
       />
+
+      {isPresentationMode && (
+        <PresentationMode
+          packetDetails={toSelections(manualOrderCards.length > 0 ? manualOrderCards : matches, versionsCacheRef)}
+          onClose={() => setIsPresentationMode(false)}
+        />
+      )}
+
+      <ReloadPrompt />
     </Container>
   );
 }

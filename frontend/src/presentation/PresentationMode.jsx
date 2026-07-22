@@ -1,0 +1,418 @@
+import React, { useState, useEffect } from 'react';
+import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, RadioGroup, FormControlLabel, Radio, Typography, Switch, TextField, Divider, Slider } from '@mui/material';
+import PresentationHome from './PresentationHome';
+import PresentationSlide from './PresentationSlide';
+import { parseChordProBlocks } from './chordproParser';
+
+const PRESET_THEMES = {
+  dark: { bg: '#000000', text: '#ffffff', chord: '#64b5f6' },
+  light: { bg: '#ffffff', text: '#000000', chord: '#1976d2' },
+  sepia: { bg: '#f4ebd9', text: '#4a3b32', chord: '#b35c00' },
+};
+
+export default function PresentationMode({ packetDetails, onClose }) {
+  // Cache packet details for reloads
+  const [cachedDetails, setCachedDetails] = useState(() => {
+    try {
+      const cached = localStorage.getItem('presentationPacketCache');
+      return (cached && cached !== 'undefined' && cached !== 'null') ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  
+  useEffect(() => {
+    if (packetDetails && packetDetails.length > 0) {
+      localStorage.setItem('presentationPacketCache', JSON.stringify(packetDetails));
+      setCachedDetails(packetDetails);
+    }
+  }, [packetDetails]);
+
+  const activeDetails = (packetDetails && packetDetails.length > 0) ? packetDetails : (cachedDetails || []);
+
+  const [activeSong, setActiveSong] = useState(() => {
+    try {
+      // 1. Check URL first
+      const path = window.location.pathname;
+      if (path.startsWith('/present/')) {
+        const id = path.split('/')[2];
+        const cached = localStorage.getItem('presentationPacketCache');
+        const details = (cached && cached !== 'undefined' && cached !== 'null') ? JSON.parse(cached) : [];
+        const songFromUrl = details.find(s => String(s.song_id) === id);
+        if (songFromUrl) return songFromUrl;
+      }
+
+      // 2. Fallback to localStorage active song
+      const cachedSong = localStorage.getItem('presentationActiveSong');
+      return (cachedSong && cachedSong !== 'undefined' && cachedSong !== 'null') ? JSON.parse(cachedSong) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // Sync state to URL and localStorage
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (activeSong) {
+      localStorage.setItem('presentationActiveSong', JSON.stringify(activeSong));
+      const targetPath = `/present/${activeSong.song_id}`;
+      if (path !== targetPath) {
+        window.history.pushState({}, '', targetPath);
+      }
+    } else {
+      localStorage.removeItem('presentationActiveSong');
+      if (path !== '/present') {
+        window.history.pushState({}, '', '/present');
+      }
+    }
+  }, [activeSong]);
+
+  // Handle Browser Back/Forward within Presentation Mode
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path === '/present') {
+        setActiveSong(null);
+      } else if (path.startsWith('/present/')) {
+        const id = path.split('/')[2];
+        const song = activeDetails.find(s => String(s.song_id) === id);
+        if (song) setActiveSong(song);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeDetails]);
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isDraggingTextSize, setIsDraggingTextSize] = useState(false);
+  
+  // Customization presets & custom colors
+  const [themeMode, setThemeMode] = useState('dark'); // 'dark', 'light', 'sepia', 'custom'
+  const [customColors, setCustomColors] = useState({
+    bg: '#000000',
+    text: '#ffffff',
+    chord: '#64b5f6',
+  });
+  
+  const [showChords, setShowChords] = useState(() => {
+    return localStorage.getItem('presentationShowChords') === 'true';
+  });
+
+  const [autoChorus, setAutoChorus] = useState(() => {
+    return localStorage.getItem('presentationAutoChorus') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('presentationShowChords', showChords);
+  }, [showChords]);
+
+  useEffect(() => {
+    localStorage.setItem('presentationAutoChorus', autoChorus);
+  }, [autoChorus]);
+  
+  const [showHeaders, setShowHeaders] = useState(false); // Default: do not show section headers
+  const [showSlideLabels, setShowSlideLabels] = useState(false); // Default: do not show slide section labels
+  const [textSizeMultiplier, setTextSizeMultiplier] = useState(1.0); // Global text scale
+
+  const handlePresetChange = (mode) => {
+    setThemeMode(mode);
+    if (PRESET_THEMES[mode]) {
+      setCustomColors(PRESET_THEMES[mode]);
+    }
+  };
+
+  const handleColorChange = (key, value) => {
+    setThemeMode('custom');
+    setCustomColors(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSelectSong = (song) => {
+    setActiveSong(song);
+  };
+
+  const handleGoHome = () => {
+    setActiveSong(null);
+    localStorage.removeItem('presentationActiveSong');
+    localStorage.removeItem('presentationSlideIndex');
+    localStorage.removeItem('presentationSlideSongId');
+  };
+
+  const handleAutoSize = () => {
+    if (!activeSong) return;
+    
+    const rawText = activeSong.chordpro_override || activeSong.chordpro_text || '';
+    if (!rawText) return;
+    const rawBlocks = parseChordProBlocks(rawText, null);
+    
+    const wh = window.innerHeight;
+    const ww = window.innerWidth;
+    const availableWidthPx = Math.max(300, ww - 48); // 24px padding left & right
+    const availablePx = wh - 240;
+
+    let bestMultiplier = 1.0;
+    let minSplits = Infinity;
+    let minLineWraps = Infinity;
+    
+    for (let m = 3.5; m >= 1.0; m -= 0.1) {
+      const baseFontSizePx = (4.5 * wh / 100) * m;
+      const lyricHeightPx = (baseFontSizePx * 1.5) + 8;
+      const chordHeightPx = (baseFontSizePx * 0.8) + 8;
+      
+      const paginationOptions = { 
+        availablePx, 
+        lyricHeightPx, 
+        chordHeightPx, 
+        showChords,
+        availableWidthPx,
+        fontSizePx: baseFontSizePx
+      };
+      const paginatedBlocks = parseChordProBlocks(rawText, paginationOptions);
+      const numSplits = paginatedBlocks.length;
+      
+      // Calculate total line wraps (extra line breaks) across all raw lines for this font size
+      let totalLineWraps = 0;
+      for (const block of rawBlocks) {
+        for (const line of block.lines) {
+          const rawStr = typeof line === 'string' ? line : (line?.lyric || '');
+          const pureText = rawStr.replace(/\[[^\]]*\]/g, '').replace(/^(verse\s*\d*[:\.\)]?\s*|v\s*\d+[:\.\)]?\s*|chorus\s*\d*[:\.\)]?\s*|bridge\s*\d*[:\.\)]?\s*|\d+[:\.\)]?\s+)/i, '');
+          const estWidth = pureText.length * baseFontSizePx * 0.53;
+          const wraps = Math.max(0, Math.ceil(estWidth / availableWidthPx) - 1);
+          totalLineWraps += wraps;
+        }
+      }
+
+      // Hierarchy:
+      // 1. Minimum slide splits (numSplits)
+      // 2. Minimum line wraps (totalLineWraps)
+      // 3. Largest text size multiplier (looping 3.5 -> 1.0 prefers larger m)
+      if (numSplits < minSplits) {
+        minSplits = numSplits;
+        minLineWraps = totalLineWraps;
+        bestMultiplier = m;
+      } else if (numSplits === minSplits) {
+        if (totalLineWraps < minLineWraps) {
+          minLineWraps = totalLineWraps;
+          bestMultiplier = m;
+        }
+      }
+    }
+    
+    setTextSizeMultiplier(Math.round(bestMultiplier * 10) / 10);
+  };
+
+  // Automatically compute optimal text size when a song is navigated to (or showChords changes)
+  useEffect(() => {
+    if (activeSong) {
+      handleAutoSize();
+    }
+  }, [activeSong?.song_id, showChords]);
+
+  return (
+    <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1200, bgcolor: customColors.bg }}>
+      {!activeSong ? (
+        <PresentationHome 
+          songs={activeDetails} 
+          showHeaders={showHeaders}
+          theme={customColors}
+          onSelectSong={handleSelectSong} 
+          onClose={onClose}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+      ) : (
+        <PresentationSlide 
+          song={activeSong} 
+          onGoHome={handleGoHome} 
+          theme={customColors} 
+          textSizeMultiplier={textSizeMultiplier}
+          showSlideLabels={showSlideLabels}
+          showChords={showChords}
+          setShowChords={setShowChords}
+          autoChorus={autoChorus}
+          setAutoChorus={setAutoChorus}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+      )}
+
+      {/* Settings Dialog with higher zIndex so it displays over presentation mode overlay */}
+      <Dialog 
+        open={settingsOpen} 
+        onClose={() => setSettingsOpen(false)}
+        sx={{ 
+          zIndex: 13000,
+          '& .MuiBackdrop-root': {
+            opacity: isDraggingTextSize ? 0.05 : undefined,
+            transition: 'opacity 0.2s',
+          }
+        }}
+        PaperProps={{
+          sx: {
+            transition: 'background-color 0.2s, box-shadow 0.2s',
+            bgcolor: isDraggingTextSize ? 'transparent' : 'background.paper',
+            boxShadow: isDraggingTextSize ? 'none' : 24,
+            backgroundImage: isDraggingTextSize ? 'none' : undefined,
+          }
+        }}
+      >
+        <DialogTitle sx={{ opacity: isDraggingTextSize ? 0.1 : 1, transition: 'opacity 0.2s' }}>
+          Presentation Settings
+        </DialogTitle>
+        <DialogContent sx={{ minWidth: 340 }}>
+          {/* Theme Section */}
+          <Box sx={{ opacity: isDraggingTextSize ? 0.1 : 1, transition: 'opacity 0.2s' }}>
+            <Typography variant="subtitle1" sx={{ mt: 1, mb: 1, fontWeight: 'bold' }}>Color Theme</Typography>
+            <RadioGroup value={themeMode} onChange={(e) => handlePresetChange(e.target.value)}>
+              <FormControlLabel value="dark" control={<Radio />} label="Dark (Black / White / Blue)" />
+              <FormControlLabel value="light" control={<Radio />} label="Light (White / Black / Dark Blue)" />
+              <FormControlLabel value="sepia" control={<Radio />} label="Sepia (Cream / Dark Brown / Rust)" />
+              <FormControlLabel value="custom" control={<Radio />} label="Custom Colors" />
+            </RadioGroup>
+
+            {/* Custom Colors - Only show if custom mode selected */}
+            {themeMode === 'custom' && (
+              <>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 'bold' }}>Custom Colors</Typography>
+                
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>Background</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <input 
+                        type="color" 
+                        value={customColors.bg} 
+                        onChange={(e) => handleColorChange('bg', e.target.value)}
+                        style={{ width: 36, height: 36, border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', padding: 0 }}
+                      />
+                      <TextField 
+                        size="small" 
+                        value={customColors.bg} 
+                        onChange={(e) => handleColorChange('bg', e.target.value)}
+                        sx={{ width: 100 }}
+                      />
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>Text Color</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <input 
+                        type="color" 
+                        value={customColors.text} 
+                        onChange={(e) => handleColorChange('text', e.target.value)}
+                        style={{ width: 36, height: 36, border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', padding: 0 }}
+                      />
+                      <TextField 
+                        size="small" 
+                        value={customColors.text} 
+                        onChange={(e) => handleColorChange('text', e.target.value)}
+                        sx={{ width: 100 }}
+                      />
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>Chord Color</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <input 
+                        type="color" 
+                        value={customColors.chord} 
+                        onChange={(e) => handleColorChange('chord', e.target.value)}
+                        style={{ width: 36, height: 36, border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', padding: 0 }}
+                      />
+                      <TextField 
+                        size="small" 
+                        value={customColors.chord} 
+                        onChange={(e) => handleColorChange('chord', e.target.value)}
+                        sx={{ width: 100 }}
+                      />
+                    </Box>
+                  </Box>
+                </Box>
+              </>
+            )}
+
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 'bold' }}>Slide Display Options</Typography>
+          </Box>
+          
+          {/* Global Text Size Slider */}
+          <Box 
+            sx={{ 
+              mb: 3, 
+              p: 1.5, 
+              borderRadius: 2, 
+              bgcolor: isDraggingTextSize ? 'transparent' : 'transparent',
+              transition: 'all 0.2s',
+              position: 'relative',
+              zIndex: 10
+            }}
+            onMouseDown={() => setIsDraggingTextSize(true)}
+            onTouchStart={() => setIsDraggingTextSize(true)}
+            onMouseUp={() => setIsDraggingTextSize(false)}
+            onTouchEnd={() => setIsDraggingTextSize(false)}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>Global Text Size</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Button size="small" variant="outlined" onClick={handleAutoSize} sx={{ py: 0, minWidth: 0, textTransform: 'none', height: 24 }}>
+                  Auto
+                </Button>
+                <Typography variant="body2" sx={{ fontWeight: 700, minWidth: '32px', textAlign: 'right' }}>
+                  {Number(textSizeMultiplier).toFixed(1)}x
+                </Typography>
+              </Box>
+            </Box>
+            <Slider
+              value={textSizeMultiplier}
+              onChange={(e, val) => setTextSizeMultiplier(val)}
+              onChangeCommitted={() => setIsDraggingTextSize(false)}
+              min={1.0}
+              max={3.5}
+              step={0.1}
+              marks={[
+                { value: 1.0, label: '1.0x' },
+                { value: 2.0, label: '2.0x' },
+                { value: 3.0, label: '3.0x' }
+              ]}
+              valueLabelDisplay="auto"
+              valueLabelFormat={(v) => `${Number(v).toFixed(1)}x`}
+            />
+          </Box>
+
+          <Box sx={{ opacity: isDraggingTextSize ? 0.1 : 1, transition: 'opacity 0.2s' }}>
+            <FormControlLabel
+              control={
+                <Switch 
+                  checked={showSlideLabels} 
+                  onChange={(e) => setShowSlideLabels(e.target.checked)} 
+                  color="primary"
+                />
+              }
+              label="Show Verse/Chorus labels on slides"
+            />
+            {/* Song List Options - Only show on Homepage Settings */}
+            {!activeSong && (
+              <>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>Song List Options</Typography>
+                <FormControlLabel
+                  control={
+                    <Switch 
+                      checked={showHeaders} 
+                      onChange={(e) => setShowHeaders(e.target.checked)} 
+                      color="primary"
+                    />
+                  }
+                  label="Show Section Headers in Song List"
+                />
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ opacity: isDraggingTextSize ? 0.1 : 1, transition: 'opacity 0.2s' }}>
+          <Button onClick={() => setSettingsOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
