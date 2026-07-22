@@ -210,4 +210,26 @@ describe('importSongPacket', () => {
     const importEvents = fetched.edit_history.filter((e) => e.event_type === 'import_packet');
     expect(importEvents.length).toBeGreaterThan(0);
   });
+
+  it('sanitizes chordproOverride to remove extra ### song versions', async () => {
+    const dirtyData = {
+      title: 'Dirty Packet',
+      current_state: {
+        matches: [
+          {
+            type: 'song',
+            chordproOverride: '### Original\n\n1\nVerse 1\n### Additional Stanza\n\n1\nVerse 1 duplicate',
+            defaultChordpro: '### Original\n\n1\nVerse 1\n### Additional Stanza\n\n1\nVerse 1 duplicate'
+          }
+        ]
+      }
+    };
+    const result = await importSongPacket(dirtyData);
+    const fetched = await getSongPacket(result.packet.id);
+    const songMatch = fetched.packet.current_state.matches[0];
+    
+    // Should strip the '### Original\n' header and remove the '### Additional Stanza' block completely
+    expect(songMatch.chordproOverride.trim()).toBe('1\nVerse 1');
+    expect(songMatch.defaultChordpro.trim()).toBe('1\nVerse 1');
+  });
 });

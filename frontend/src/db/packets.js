@@ -233,11 +233,36 @@ export async function exportSongPacket(packetId) {
 export async function importSongPacket(packetData) {
   const db = await getDb();
   const now = Date.now();
+  const sanitizeChordpro = (text) => {
+    if (!text) return text;
+    const blocks = text.split(/(?=^###\s*)/m).filter(b => b.trim());
+    let chordpro = blocks.length > 0 ? blocks[0] : text;
+    if (chordpro.startsWith('###')) {
+      const idx = chordpro.indexOf('\n');
+      if (idx !== -1) chordpro = chordpro.substring(idx).trim();
+    }
+    return chordpro;
+  };
+
+  const safeCurrentState = packetData.current_state || {};
+  if (Array.isArray(safeCurrentState.matches)) {
+    safeCurrentState.matches = safeCurrentState.matches.map(m => {
+      if (m.type === 'song') {
+        return {
+          ...m,
+          chordproOverride: sanitizeChordpro(m.chordproOverride),
+          defaultChordpro: sanitizeChordpro(m.defaultChordpro)
+        };
+      }
+      return m;
+    });
+  }
+
   const packet = {
     title: packetData.title || 'Imported Packet',
     created_at: packetData.created_at || now,
     updated_at: now,
-    current_state: packetData.current_state || {},
+    current_state: safeCurrentState,
     versions: Array.isArray(packetData.versions) ? packetData.versions : [],
     history: Array.isArray(packetData.history) ? packetData.history : [{
       event_type: 'import_packet',
