@@ -250,3 +250,8 @@ export async function importSongPacket(packetData) {
   const id = await db.add('packets', packet);
   return getSongPacket(id);
 }
+
+export async function deleteSongPacket(packetId) {
+  const db = await getDb();
+  await db.delete('packets', parseInt(packetId, 10));
+}

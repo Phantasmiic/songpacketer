@@ -205,6 +205,8 @@ export default function PresentationSlide({
     return parseChordProBlocks(transposedText, paginationOptions);
   }, [song, paginationOptions, chordShift]);
 
+  const hasChorus = useMemo(() => rawBlocks.some(b => b.type === 'chorus'), [rawBlocks]);
+
   // Build the presentation sequence (handling repeating chorus)
   const presentationSequence = useMemo(() => {
     if (!autoChorus || rawBlocks.length === 0) return rawBlocks;
@@ -316,9 +318,11 @@ export default function PresentationSlide({
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
         return;
       }
-      if (e.key === 'ArrowRight' || e.key === ' ') {
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(e.key)) {
+        e.preventDefault();
         handleNext();
-      } else if (e.key === 'ArrowLeft') {
+      } else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(e.key)) {
+        e.preventDefault();
         handlePrev();
       } else if (e.key === 'Escape') {
         onGoHome();
@@ -466,26 +470,33 @@ export default function PresentationSlide({
 
           {/* Repeat Chorus Button with Instant Tooltip */}
           <Tooltip 
-            title="Automatically inserts a chorus slide after each verse slide" 
+            title={hasChorus ? "Automatically inserts a chorus slide after each verse slide" : "No chorus detected in this song"} 
             enterDelay={0} 
             leaveDelay={100} 
             arrow
           >
-            <Button
-              variant={autoChorus ? 'contained' : 'outlined'}
-              size="small"
-              onClick={() => setAutoChorus(!autoChorus)}
-              sx={{ 
-                borderRadius: 2,
-                fontWeight: 600,
-                textTransform: 'none',
-                borderColor: textColor,
-                color: autoChorus ? 'primary.contrastText' : textColor,
-                px: 2
-              }}
-            >
-              Repeat chorus
-            </Button>
+            <span>
+              <Button
+                variant={autoChorus ? 'contained' : 'outlined'}
+                size="small"
+                disabled={!hasChorus}
+                onClick={() => setAutoChorus(!autoChorus)}
+                sx={{ 
+                  borderRadius: 2,
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  borderColor: textColor,
+                  color: autoChorus && hasChorus ? 'primary.contrastText' : textColor,
+                  px: 2,
+                  '&.Mui-disabled': {
+                    borderColor: 'rgba(127,127,127,0.3)',
+                    color: 'rgba(127,127,127,0.5)'
+                  }
+                }}
+              >
+                Repeat chorus
+              </Button>
+            </span>
           </Tooltip>
 
           {onOpenSettings && (
@@ -575,7 +586,7 @@ export default function PresentationSlide({
           flexWrap: 'wrap',
           gap: 1.2,
           px: 2,
-          opacity: 0.4,
+          opacity: 0.7,
           transition: 'opacity 0.25s ease-in-out',
           '&:hover': { opacity: 0.95 }
         }}
@@ -590,7 +601,7 @@ export default function PresentationSlide({
                 borderColor: textColor, 
                 borderRadius: 1.5, 
                 overflow: 'hidden',
-                opacity: group.slides.some(s => s.idx === currentBlockIndex) ? 1 : 0.65,
+                opacity: group.slides.some(s => s.idx === currentBlockIndex) ? 1 : 0.8,
                 transition: 'all 0.2s',
                 '&:hover': { transform: 'scale(1.1)', opacity: 1 }
               }}

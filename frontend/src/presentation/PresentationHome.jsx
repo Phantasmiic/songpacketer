@@ -3,6 +3,7 @@ import { Box, TextField, Typography, List, ListItem, ListItemText, ListItemButto
 import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SearchIcon from '@mui/icons-material/Search';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 export default function PresentationHome({ 
   songs, 
@@ -66,8 +67,8 @@ export default function PresentationHome({
 
   return (
     <Box sx={{
-      height: '100vh',
-      width: '100vw',
+      position: 'absolute',
+      top: 0, left: 0, right: 0, bottom: 0,
       display: 'flex',
       flexDirection: 'column',
       bgcolor: bgColor,
@@ -76,10 +77,12 @@ export default function PresentationHome({
       transition: 'background-color 0.2s, color 0.2s'
     }}>
       {/* Header Bar */}
-      <Box sx={{ p: 2, px: 4, display: 'flex', alignItems: 'center', gap: 2, borderBottom: '1px solid', borderColor: borderColor }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: 1, flexGrow: 1, color: textColor }}>
-          PRESENTATION
-        </Typography>
+      <Box sx={{ height: 72, boxSizing: 'border-box', p: 2, px: 4, display: 'flex', alignItems: 'center', gap: 2, borderBottom: '1px solid', borderColor: borderColor }}>
+        <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+          <IconButton onClick={onClose} title="Go Back" sx={{ color: textColor }}>
+            <ArrowBackIcon />
+          </IconButton>
+        </Box>
         
         {/* Search Input */}
         <TextField
@@ -114,40 +117,42 @@ export default function PresentationHome({
         <IconButton onClick={onOpenSettings} title="Settings" sx={{ color: textColor }}>
           <SettingsIcon />
         </IconButton>
-        <IconButton onClick={onClose} title="Exit Presentation" sx={{ color: textColor }}>
-          <CloseIcon />
-        </IconButton>
       </Box>
 
       {/* Main Presentation Homepage Content */}
-      <Box sx={{ flexGrow: 1, overflowY: 'auto', p: { xs: 3, md: 6 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <Paper 
-          elevation={0}
-          sx={{ 
-            width: '100%', 
-            maxWidth: 900, 
-            bgcolor: paperBgColor, 
-            color: textColor,
-            borderRadius: 3, 
-            border: '1px solid',
-            borderColor: borderColor,
-            overflow: 'hidden',
-            p: 2
-          }} 
-        >
-          <List disablePadding>
+      <Box sx={{ height: 'calc(100% - 72px)', boxSizing: 'border-box', overflowY: 'auto', p: { xs: 3, md: 6 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+          <Paper 
+            elevation={0}
+            sx={{ 
+              width: '100%', 
+              maxWidth: 1200, 
+              bgcolor: paperBgColor, 
+              color: textColor,
+              borderRadius: 3, 
+              border: '1px solid',
+              borderColor: borderColor,
+              overflow: 'hidden',
+              p: 3
+            }} 
+          >
+          <List disablePadding sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, 
+            columnGap: 4,
+            rowGap: 0.5
+          }}>
             {filteredSongs.map((item, index) => {
               if (item.type === 'section') {
                 return (
-                  <Box key={`section-${index}`}>
+                  <Box key={`section-${index}`} sx={{ gridColumn: '1 / -1', mt: index > 0 ? 2 : 0, mb: 1 }}>
                     {index > 0 && <Divider sx={{ borderColor: borderColor }} />}
-                    <ListItem sx={{ bgcolor: 'rgba(127, 127, 127, 0.1)', py: 1.5 }}>
+                    <ListItem sx={{ bgcolor: 'rgba(127, 127, 127, 0.1)', py: 1.5, borderRadius: 1 }}>
                       <ListItemText 
                         primary={item.title} 
                         primaryTypographyProps={{ variant: 'h6', fontWeight: 'bold', color: accentColor, letterSpacing: 1 }} 
                       />
                     </ListItem>
-                    <Divider sx={{ borderColor: borderColor }} />
                   </Box>
                 );
               }
@@ -160,10 +165,9 @@ export default function PresentationHome({
                   key={`song-${item.song_id || index}`} 
                   onClick={() => onSelectSong(item)}
                   sx={{ 
-                    py: 2, 
+                    py: 1.5, 
                     px: 3,
                     borderRadius: 1.5,
-                    mb: 0.5,
                     transition: 'background-color 0.2s',
                     '&:hover': { bgcolor: itemHoverBgColor } 
                   }}
@@ -190,12 +194,13 @@ export default function PresentationHome({
               );
             })}
             {filteredSongs.length === 0 && (
-              <Box sx={{ p: 6, textAlign: 'center' }}>
+              <Box sx={{ p: 6, textAlign: 'center', gridColumn: '1 / -1' }}>
                 <Typography color="text.secondary" variant="h6">No songs found.</Typography>
               </Box>
             )}
           </List>
         </Paper>
+        </Box>
       </Box>
     </Box>
   );

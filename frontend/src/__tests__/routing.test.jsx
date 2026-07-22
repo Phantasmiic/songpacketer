@@ -28,7 +28,7 @@ describe('URL Routing Synchronization', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('PRESENTATION')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search')).toBeInTheDocument();
     });
     expect(window.location.pathname).toBe('/present');
   });
@@ -38,7 +38,7 @@ describe('URL Routing Synchronization', () => {
     render(<App />);
     
     // We should see the Presentation Home
-    expect(screen.getByText('PRESENTATION')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search')).toBeInTheDocument();
   });
 
   it('PresentationMode syncing activeSong to URL', async () => {
@@ -80,9 +80,9 @@ describe('URL Routing Synchronization', () => {
       window.dispatchEvent(new Event('popstate'));
     });
 
-    // The component should update its state and render the home view (PRESENTATION header)
+    // The component should update its state and render the home view
     await waitFor(() => {
-      expect(screen.getByText('PRESENTATION')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search')).toBeInTheDocument();
     });
   });
 });

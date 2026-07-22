@@ -11,6 +11,12 @@ import {
   ListItemButton,
   ListItemText,
   Divider,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
@@ -18,6 +24,7 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 function InputStep({
   packetTitle,
@@ -28,10 +35,12 @@ function InputStep({
   onOpenExisting,
   onCreateAndMatch,
   onImportPacket,
+  onDeletePacket,
   loading,
 }) {
   const [activeView, setActiveView] = useState('menu'); // 'menu' | 'create' | 'open'
   const [searchQuery, setSearchQuery] = useState('');
+  const [packetToDelete, setPacketToDelete] = useState(null);
 
   const handleFileChange = (e) => {
     onImportPacket(e);
@@ -158,10 +167,25 @@ function InputStep({
                 filteredPackets.map((packet, index) => (
                   <Box key={packet.id}>
                     {index > 0 && <Divider />}
-                    <ListItemButton onClick={() => onOpenExisting(packet.id)} sx={{ py: 1.5, px: 2.5 }}>
+                    <ListItemButton 
+                      onClick={() => onOpenExisting(packet.id)} 
+                      sx={{ py: 1.5, px: 2.5 }}
+                      secondaryAction={
+                        <IconButton 
+                          edge="end" 
+                          aria-label="delete"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPacketToDelete(packet);
+                          }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      }
+                    >
                       <ListItemText
                         primary={
-                          <Typography variant="body1" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                          <Typography variant="body1" sx={{ fontWeight: 600, color: 'primary.main', pr: 4 }}>
                             {packet.title}
                           </Typography>
                         }
@@ -178,6 +202,35 @@ function InputStep({
             </List>
           </Paper>
         </Stack>
+
+        <Dialog
+          open={Boolean(packetToDelete)}
+          onClose={() => setPacketToDelete(null)}
+        >
+          <DialogTitle>Delete Packet?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to delete the packet "{packetToDelete?.title}"? This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPacketToDelete(null)} color="primary">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (packetToDelete) {
+                  onDeletePacket(packetToDelete.id);
+                  setPacketToDelete(null);
+                }
+              }} 
+              color="error" 
+              autoFocus
+            >
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
     );
   }

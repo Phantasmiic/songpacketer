@@ -10,7 +10,8 @@ import {
   activateSongPacketVersion as dbActivateSongPacketVersion,
   exportSongPacket as dbExportSongPacket,
   importSongPacket as dbImportSongPacket,
-  updateSongPacketTitle as dbUpdateSongPacketTitle
+  updateSongPacketTitle as dbUpdateSongPacketTitle,
+  deleteSongPacket as dbDeleteSongPacket
 } from '../db/packets';
 import { renderSongPacketPdf } from '../pdf/engine';
 
@@ -152,4 +153,8 @@ export async function importSongPacket(packetData) {
 
 export async function updateSongPacketTitle(packetId, title) {
   return await dbUpdateSongPacketTitle(packetId, title);
+}
+
+export async function deleteSongPacket(packetId) {
+  return await dbDeleteSongPacket(packetId);
 }

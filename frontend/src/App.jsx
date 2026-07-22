@@ -52,6 +52,7 @@ import {
   exportSongPacket,
   importSongPacket,
   updateSongPacketTitle,
+  deleteSongPacket,
 } from './api/client';
 
 const steps = ['Input', 'Refine', 'Layout'];
@@ -1159,6 +1160,24 @@ function App() {
     }
   };
 
+  const handleDeletePacket = async (packetId) => {
+    try {
+      await deleteSongPacket(packetId);
+      if (activePacket?.id === packetId) {
+        setActivePacket(null);
+        setPacketTitle('');
+        setSelectedPacketId('');
+        setPacketMode('new');
+        setMatches([]);
+        setInputText('');
+      }
+      await loadPacketList();
+      setToast('Packet deleted successfully.');
+    } catch (err) {
+      setError(err.message || 'Failed to delete packet.');
+    }
+  };
+
   const handleExportPacket = async () => {
     if (!activePacket?.id) return;
     try {
@@ -1747,6 +1766,7 @@ function App() {
             onOpenExisting={handleOpenExisting}
             onCreateAndMatch={handleCreateAndMatch}
             onImportPacket={handleImportPacket}
+            onDeletePacket={handleDeletePacket}
             loading={loading}
           />
         )}
