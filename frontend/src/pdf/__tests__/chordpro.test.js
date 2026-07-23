@@ -49,6 +49,14 @@ describe('chordproToLines', () => {
     expect(lines[1]).toEqual({ chord: '', lyric: '' });
     expect(lines[2]).toEqual({ chord: 'C', lyric: 'Line two' });
   });
+
+  it('skips comment lines starting with #', () => {
+    const input = '#Capo 3\n[G]Line one\n#Romans 8:10\n[C]Line two';
+    const lines = chordproToLines(input);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toEqual({ chord: 'G', lyric: 'Line one' });
+    expect(lines[1]).toEqual({ chord: 'C', lyric: 'Line two' });
+  });
 });
 
 describe('songRows', () => {

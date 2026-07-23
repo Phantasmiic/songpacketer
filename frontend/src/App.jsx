@@ -140,6 +140,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [initializing, setInitializing] = useState(true);
+  const [isHydrating, setIsHydrating] = useState(false);
   const [syncedCount, setSyncedCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState(localStorage.getItem('songpacketer_last_sync') || null);
@@ -350,6 +351,7 @@ function App() {
   };
 
   const hydrateFromPacketState = async (state) => {
+    setIsHydrating(true);
     const nextState = state || {};
     const nextMatches = Array.isArray(nextState.matches) ? nextState.matches : [];
     setInputText(nextState.input_text || '');
@@ -430,6 +432,7 @@ function App() {
     setStep(nextStep);
     setActiveReviewRowIndex(0);
     setDuplicateRemovedCount(nextState.duplicate_removed_count || 0);
+    setIsHydrating(false);
   };
 
   const applyPacketPayload = (payload, shouldHydrateState = true) => {
@@ -1848,6 +1851,7 @@ function App() {
 
       {isPresentationMode && (
         <PresentationMode
+          isLoading={isHydrating}
           packetDetails={toSelections(manualOrderCards.length > 0 ? manualOrderCards : matches, versionsCacheRef)}
           onClose={() => setIsPresentationMode(false)}
         />

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Box, Typography, IconButton, Button, Tooltip } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -113,8 +113,11 @@ export default function PresentationSlide({
   setShowChords,
   autoChorus,
   setAutoChorus,
+  fullSongMode,
+  setFullSongMode,
   onOpenSettings 
 }) {
+  const effectiveShowChords = fullSongMode ? false : showChords;
   const [currentBlockIndex, setCurrentBlockIndex] = useState(() => {
     const cached = localStorage.getItem('presentationSlideIndex');
     const cachedSongId = localStorage.getItem('presentationSlideSongId');
@@ -130,6 +133,17 @@ export default function PresentationSlide({
   const [debugCopied, setDebugCopied] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const alwaysShowControls = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('alwaysShowControls') === 'true' || 
+           params.get('agent') === 'true' || 
+           params.get('showControls') === 'true' || 
+           localStorage.getItem('alwaysShowControls') === 'true';
+  }, []);
+
+  const effectiveShowControls = alwaysShowControls || showControls;
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -184,7 +198,6 @@ export default function PresentationSlide({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Calculate dynamic pagination options based on viewport and text size
   const paginationOptions = useMemo(() => {
     const availablePx = windowHeight - 240; // Safely subtract padding and UI elements
     const baseFontSizePx = (4.5 * windowHeight / 100) * textSizeMultiplier;
@@ -195,21 +208,38 @@ export default function PresentationSlide({
     // Chords use 0.8em font size + 1.0 line height + extra 8px margin
     const chordHeightPx = (baseFontSizePx * 0.8) + 8;
     
-    return { availablePx, lyricHeightPx, chordHeightPx, showChords };
-  }, [windowHeight, textSizeMultiplier, showChords]);
+    // Approximate available width
+    const ww = typeof window !== 'undefined' ? window.innerWidth : 1000;
+    const availableWidthPx = Math.max(300, ww - 48);
+    
+    return { 
+      availablePx, 
+      lyricHeightPx, 
+      chordHeightPx, 
+      showChords: effectiveShowChords,
+      availableWidthPx,
+      fontSizePx: baseFontSizePx
+    };
+  }, [windowHeight, textSizeMultiplier, effectiveShowChords]);
 
   // Parse blocks once (with optional chord transposition)
   const rawBlocks = useMemo(() => {
     const rawText = song.chordpro_override || song.chordpro_text || '';
     const transposedText = chordShift !== 0 ? transposeChordProText(rawText, chordShift) : rawText;
-    return parseChordProBlocks(transposedText, paginationOptions);
-  }, [song, paginationOptions, chordShift]);
+    return parseChordProBlocks(transposedText, fullSongMode ? null : paginationOptions);
+  }, [song, paginationOptions, chordShift, fullSongMode]);
+
+  // Ref for the full-song container, used for DOM-based auto-sizing
+  const fullSongRef = useRef(null);
+  const [fullSongFontPx, setFullSongFontPx] = useState(16);
+  const [fullSongColumns, setFullSongColumns] = useState('auto');
+
 
   const hasChorus = useMemo(() => rawBlocks.some(b => b.type === 'chorus'), [rawBlocks]);
 
   // Build the presentation sequence (handling repeating chorus)
   const presentationSequence = useMemo(() => {
-    if (!autoChorus || rawBlocks.length === 0) return rawBlocks;
+    if (!autoChorus || fullSongMode || rawBlocks.length === 0) return rawBlocks;
     
     // Find the first chorus to use as the repeating chorus
     const firstChorusBlock = rawBlocks.find(b => b.type === 'chorus');
@@ -241,7 +271,82 @@ export default function PresentationSlide({
       }
     }
     return sequence;
-  }, [rawBlocks, autoChorus]);
+  }, [rawBlocks, autoChorus, fullSongMode]);
+
+  const optimalColumnWidthEm = useMemo(() => {
+    const lengths = [];
+    for (const block of rawBlocks) {
+      for (const line of block.lines) {
+        let text = typeof line === 'string' ? line : (line?.lyric || '');
+        text = text.replace(/\[[^\]]*\]/g, '').trim(); // strip chords
+        if (text.length > 0) lengths.push(text.length);
+      }
+    }
+    if (lengths.length === 0) return 16;
+    
+    lengths.sort((a, b) => a - b);
+    // Use the 85th percentile to ignore extreme outliers (like copyright lines)
+    const p85 = lengths[Math.floor(lengths.length * 0.85)];
+    const calculated = p85 * 0.55; // roughly 0.55em per char
+    
+    // Cap between 15em and 20em. >20em is too wide for readability and hurts multi-column packing.
+    return Math.max(15, Math.min(20, calculated));
+  }, [rawBlocks]);
+
+  // DOM-measurement auto-sizing for full song mode.
+  // Binary search for the largest font-size (px) where the content doesn't overflow.
+  // We use a ResizeObserver to re-run layout checks whenever the container size changes.
+  useEffect(() => {
+    if (!fullSongMode || !fullSongRef.current) return;
+
+    const el = fullSongRef.current;
+
+    const resizeObserver = new ResizeObserver(() => {
+      // Temporarily remove overflow:hidden so we can measure true scroll dimensions
+      el.style.overflow = 'auto';
+
+      const fits = (sizePx) => {
+        el.style.fontSize = `${sizePx}px`;
+        const colWidthPx = optimalColumnWidthEm * sizePx;
+        const colGapPx = 1.2 * sizePx;
+        const maxCols = Math.max(1, Math.floor((el.clientWidth + colGapPx) / (colWidthPx + colGapPx)));
+        el.style.columnCount = maxCols;
+        // Force reflow
+        void el.offsetHeight;
+        // With CSS columns, overflow shows as scrollWidth > clientWidth (extra columns)
+        // or scrollHeight > clientHeight (content too tall for a single column to fill)
+        return el.scrollWidth <= el.clientWidth + 2 && el.scrollHeight <= el.clientHeight + 2;
+      };
+
+      let lo = 6;
+      let hi = 80;
+      let best = lo;
+
+      // Binary search: find the largest font that fits
+      while (hi - lo > 0.5) {
+        const mid = (lo + hi) / 2;
+        if (fits(mid)) {
+          best = mid;
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+
+      const finalSize = Math.floor(best * 2) / 2; // round to nearest 0.5
+      setFullSongFontPx(finalSize);
+      const colWidthPx = optimalColumnWidthEm * finalSize;
+      const colGapPx = 1.2 * finalSize;
+      const finalCols = Math.max(1, Math.floor((el.clientWidth + colGapPx) / (colWidthPx + colGapPx)));
+      setFullSongColumns(finalCols);
+      el.style.fontSize = `${finalSize}px`;
+      el.style.columnCount = finalCols;
+      el.style.overflow = 'hidden';
+    });
+
+    resizeObserver.observe(el);
+    return () => resizeObserver.disconnect();
+  }, [fullSongMode, presentationSequence, optimalColumnWidthEm]);
 
   // Pre-calculate slide metadata for grouping bars
   const slideMetas = useMemo(() => {
@@ -277,7 +382,8 @@ export default function PresentationSlide({
       songbaseUrl: sId ? `https://songbase.life/${sId}` : null,
       title: song.title_override || song.title || song.input_text || '',
       autoChorus,
-      showChords,
+      fullSongMode,
+      showChords: effectiveShowChords,
       chordShift,
       textSizeMultiplier,
       windowHeight,
@@ -292,6 +398,7 @@ export default function PresentationSlide({
         firstLineLyric: block.lines[0]?.lyric || '',
         lastLineLyric: block.lines[block.lines.length - 1]?.lyric || ''
       })),
+      fullSongFontPx,
       rawTextSample: (song.chordpro_override || song.chordpro_text || '').slice(0, 300)
     };
 
@@ -381,8 +488,8 @@ export default function PresentationSlide({
           justifyContent: 'space-between', 
           alignItems: 'center', 
           zIndex: 10,
-          opacity: showControls ? 1 : 0,
-          pointerEvents: showControls ? 'auto' : 'none',
+          opacity: effectiveShowControls ? 1 : 0,
+          pointerEvents: effectiveShowControls ? 'auto' : 'none',
           transition: 'opacity 0.3s ease-in-out'
         }}
       >
@@ -405,16 +512,21 @@ export default function PresentationSlide({
           {/* Chords & Transpose Group */}
           <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
             <Button
-              variant={showChords ? 'contained' : 'outlined'}
+              variant={effectiveShowChords ? 'contained' : 'outlined'}
               size="small"
+              disabled={fullSongMode}
               onClick={() => setShowChords(!showChords)}
               sx={{ 
-                borderRadius: showChords ? '8px 0 0 8px' : 2,
+                borderRadius: effectiveShowChords ? '8px 0 0 8px' : 2,
                 fontWeight: 600,
                 textTransform: 'none',
                 borderColor: textColor,
-                color: showChords ? 'primary.contrastText' : textColor,
-                px: 2
+                color: effectiveShowChords ? 'primary.contrastText' : textColor,
+                px: 2,
+                '&.Mui-disabled': {
+                  borderColor: 'rgba(127,127,127,0.3)',
+                  color: 'rgba(127,127,127,0.5)'
+                }
               }}
             >
               Chords
@@ -468,6 +580,24 @@ export default function PresentationSlide({
             )}
           </Box>
 
+          <Tooltip title="Maximize text and display the entire song on one screen without pagination" enterDelay={0} arrow>
+            <Button
+              variant={fullSongMode ? 'contained' : 'outlined'}
+              size="small"
+              onClick={() => setFullSongMode(!fullSongMode)}
+              sx={{ 
+                borderRadius: 2,
+                fontWeight: 600,
+                textTransform: 'none',
+                borderColor: textColor,
+                color: fullSongMode ? 'primary.contrastText' : textColor,
+                px: 2
+              }}
+            >
+              Full song
+            </Button>
+          </Tooltip>
+
           {/* Repeat Chorus Button with Instant Tooltip */}
           <Tooltip 
             title={hasChorus ? "Automatically inserts a chorus slide after each verse slide" : "No chorus detected in this song"} 
@@ -477,9 +607,9 @@ export default function PresentationSlide({
           >
             <span>
               <Button
-                variant={autoChorus ? 'contained' : 'outlined'}
+                variant={autoChorus && !fullSongMode ? 'contained' : 'outlined'}
                 size="small"
-                disabled={!hasChorus}
+                disabled={!hasChorus || fullSongMode}
                 onClick={() => setAutoChorus(!autoChorus)}
                 sx={{ 
                   borderRadius: 2,
@@ -523,7 +653,7 @@ export default function PresentationSlide({
       </Box>
 
       {/* Large Section Indicator - Top Left (below home button) */}
-      {showSlideLabels && (() => {
+      {!fullSongMode && showSlideLabels && (() => {
         const label = getUpperLeftLabel(currentBlock);
         const isNumber = /^\d+$/.test(label);
         return (
@@ -545,103 +675,154 @@ export default function PresentationSlide({
       })()}
 
       {/* Main Content */}
-      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: 3, py: 10 }}>
+      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: fullSongMode ? 'flex-start' : 'center', justifyContent: fullSongMode ? 'flex-start' : 'center', px: fullSongMode ? 2 : 3, pt: fullSongMode ? '56px' : 10, pb: fullSongMode ? 1 : 10 }}>
 
-
-        {/* Lines */}
-        <Box sx={{ fontSize: `calc(${textSizeMultiplier} * 4.5vh)`, fontWeight: 500, lineHeight: 1.5, textAlign: 'left', width: '100%', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
-          {currentBlock.lines.map((line, idx) => {
-            const hasChord = Boolean(line.chord && line.chord.trim().length > 0);
-            let displayLyric = line.lyric || ' ';
-            // Strip leading verse numbers/labels from the first line of text
-            if (idx === 0) {
-              displayLyric = displayLyric.replace(/^(verse\s*\d*[:\.\)]?\s*|v\s*\d+[:\.\)]?\s*|chorus\s*\d*[:\.\)]?\s*|bridge\s*\d*[:\.\)]?\s*|\d+[:\.\)]?\s+)/i, '');
-            }
-            return (
-              <Box key={idx} sx={{ display: 'flex', flexDirection: 'column', minHeight: '1.2em', mb: showChords && hasChord ? 2 : 1 }}>
-                {showChords && hasChord && (
-                  <Box sx={{ color: chordColor, fontWeight: 'bold', fontFamily: 'monospace', whiteSpace: 'pre', fontSize: '0.8em', lineHeight: 1 }}>
-                    {line.chord}
+        {fullSongMode ? (
+          /* Full Song Mode: fixed-height container, auto columns, DOM-measured font size */
+          <Box
+            key="full-song-box"
+            ref={fullSongRef}
+            sx={{
+              fontWeight: 500,
+              lineHeight: 1.35,
+              textAlign: 'left',
+              width: '100%',
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              fontSize: `${fullSongFontPx}px`,
+              columnCount: fullSongColumns,
+              columnGap: '1.2em',
+              columnFill: 'balance',
+              height: 'calc(100vh - 100px)',
+              overflow: 'hidden',
+            }}
+          >
+            {presentationSequence.map((block, blockIdx) => (
+              <Box key={blockIdx} sx={{ mb: '1.2em', breakInside: 'avoid-column' }}>
+                {block.label && (
+                  <Box sx={{
+                    fontWeight: 700,
+                    fontSize: '0.7em', // proportional to the lyric font size
+                    color: chordColor,
+                    opacity: 0.85,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    mb: '0.1em'
+                  }}>
+                    {block.label}
                   </Box>
                 )}
-                <Box sx={{ whiteSpace: 'pre-wrap' }}>
-                  {displayLyric}
+                {block.lines.map((line, idx) => {
+                  let displayLyric = line.lyric || ' ';
+                  if (idx === 0) {
+                    displayLyric = displayLyric.replace(/^(verse\s*\d*[:\.\)]?\s*|v\s*\d+[:\.\)]?\s*|chorus\s*\d*[:\.\)]?\s*|bridge\s*\d*[:\.\)]?\s*|\d+[:\.\)]?\s+)/i, '');
+                  }
+                  return (
+                    <Box key={idx} sx={{ whiteSpace: 'pre-wrap', minHeight: '1.1em' }}>
+                      {displayLyric}
+                    </Box>
+                  );
+                })}
+              </Box>
+            ))}
+          </Box>
+        ) : (
+          /* Normal paginated mode */
+          <Box key="paginated-box" sx={{ fontSize: `calc(${textSizeMultiplier} * 4.5vh)`, fontWeight: 500, lineHeight: 1.5, textAlign: 'left', width: '100%', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+            {currentBlock.lines.map((line, idx) => {
+              const hasChord = Boolean(line.chord && line.chord.trim().length > 0);
+              let displayLyric = line.lyric || ' ';
+              // Strip leading verse numbers/labels from the first line of text
+              if (idx === 0) {
+                displayLyric = displayLyric.replace(/^(verse\s*\d*[:\.\)]?\s*|v\s*\d+[:\.\)]?\s*|chorus\s*\d*[:\.\)]?\s*|bridge\s*\d*[:\.\)]?\s*|\d+[:\.\)]?\s+)/i, '');
+              }
+              return (
+                <Box key={idx} sx={{ display: 'flex', flexDirection: 'column', minHeight: '1.2em', mb: effectiveShowChords && hasChord ? 2 : 1 }}>
+                  {effectiveShowChords && hasChord && (
+                    <Box sx={{ color: chordColor, fontWeight: 'bold', fontFamily: 'monospace', whiteSpace: 'pre', fontSize: '0.8em', lineHeight: 1 }}>
+                      {line.chord}
+                    </Box>
+                  )}
+                  <Box sx={{ whiteSpace: 'pre-wrap' }}>
+                    {displayLyric}
+                  </Box>
                 </Box>
+              );
+            })}
+          </Box>
+        )}
+      </Box>
+
+      {/* Bottom Progress/Navigation Icons */}
+      {!fullSongMode && (
+        <Box 
+          sx={{ 
+            position: 'absolute', 
+            bottom: 20, 
+            left: 0, 
+            right: 0, 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1.2,
+            px: 2,
+            opacity: 0.7,
+            transition: 'opacity 0.25s ease-in-out',
+            '&:hover': { opacity: 0.95 }
+          }}
+        >
+          {groupedSlides.map((group, groupIdx) => {
+            return (
+              <Box 
+                key={groupIdx} 
+                sx={{ 
+                  display: 'flex', 
+                  border: '1.5px solid', 
+                  borderColor: textColor, 
+                  borderRadius: 1.5, 
+                  overflow: 'hidden',
+                  opacity: group.slides.some(s => s.idx === currentBlockIndex) ? 1 : 0.8,
+                  transition: 'all 0.2s',
+                  '&:hover': { transform: 'scale(1.1)', opacity: 1 }
+                }}
+              >
+                {group.slides.map((slide, i) => {
+                  const isCurrent = slide.idx === currentBlockIndex;
+                  const isLastInGroup = i === group.slides.length - 1;
+
+                  return (
+                    <Box 
+                      key={slide.idx}
+                      onClick={() => setCurrentBlockIndex(slide.idx)}
+                      sx={{
+                        width: 32, 
+                        height: 32, 
+                        bgcolor: isCurrent ? textColor : 'transparent',
+                        color: isCurrent ? bgColor : textColor,
+                        borderRight: !isLastInGroup ? '1.5px solid' : 'none',
+                        borderRightColor: textColor,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        fontFamily: 'system-ui, sans-serif',
+                        userSelect: 'none',
+                        transition: 'all 0.2s',
+                        '&:hover': { bgcolor: isCurrent ? textColor : 'rgba(127,127,127,0.2)' }
+                      }}
+                      title={slide.block.label}
+                    >
+                      {slide.meta.displayChar}
+                    </Box>
+                  );
+                })}
               </Box>
             );
           })}
         </Box>
-      </Box>
-
-      {/* Bottom Progress/Navigation Icons */}
-      <Box 
-        sx={{ 
-          position: 'absolute', 
-          bottom: 20, 
-          left: 0, 
-          right: 0, 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 1.2,
-          px: 2,
-          opacity: 0.7,
-          transition: 'opacity 0.25s ease-in-out',
-          '&:hover': { opacity: 0.95 }
-        }}
-      >
-        {groupedSlides.map((group, groupIdx) => {
-          return (
-            <Box 
-              key={groupIdx} 
-              sx={{ 
-                display: 'flex', 
-                border: '1.5px solid', 
-                borderColor: textColor, 
-                borderRadius: 1.5, 
-                overflow: 'hidden',
-                opacity: group.slides.some(s => s.idx === currentBlockIndex) ? 1 : 0.8,
-                transition: 'all 0.2s',
-                '&:hover': { transform: 'scale(1.1)', opacity: 1 }
-              }}
-            >
-              {group.slides.map((slide, i) => {
-                const isCurrent = slide.idx === currentBlockIndex;
-                const isLastInGroup = i === group.slides.length - 1;
-
-                return (
-                  <Box 
-                    key={slide.idx}
-                    onClick={() => setCurrentBlockIndex(slide.idx)}
-                    sx={{
-                      width: 32, 
-                      height: 32, 
-                      bgcolor: isCurrent ? textColor : 'transparent',
-                      color: isCurrent ? bgColor : textColor,
-                      borderRight: !isLastInGroup ? '1.5px solid' : 'none',
-                      borderRightColor: textColor,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                      fontFamily: 'system-ui, sans-serif',
-                      userSelect: 'none',
-                      transition: 'all 0.2s',
-                      '&:hover': { bgcolor: isCurrent ? textColor : 'rgba(127,127,127,0.2)' }
-                    }}
-                    title={slide.block.label}
-                  >
-                    {slide.meta.displayChar}
-                  </Box>
-                );
-              })}
-            </Box>
-          );
-        })}
-      </Box>
+      )}
     </Box>
   );
 }

@@ -10,6 +10,9 @@ export function parseChordProBlocks(chordproText, paginationOptions = null) {
   
   for (const rawLine of lines) {
     const trimmed = rawLine.trim();
+    if (trimmed.startsWith('#')) {
+      continue;
+    }
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       const directive = trimmed.substring(1, trimmed.length - 1).toLowerCase();
       if (
@@ -212,12 +215,20 @@ export function parseChordProBlocks(chordproText, paginationOptions = null) {
     pushCurrentBlock();
   } else {
     // No explicit sections in song!
-    // Treat whole song as lines (preserving blank lines for spacing between stanzas)
+    // Separate stanzas by blank lines into individual blocks
     currentBlockType = 'section';
     currentBlockLabel = '';
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].replace(/\r$/, '');
+      const trimmed = line.trim();
+      if (trimmed.startsWith('#')) {
+        continue;
+      }
+      if (trimmed === '') {
+        pushCurrentBlock();
+        continue;
+      }
       currentLines.push(line);
     }
     pushCurrentBlock();

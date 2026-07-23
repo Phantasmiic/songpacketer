@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, RadioGroup, FormControlLabel, Radio, Typography, Switch, TextField, Divider, Slider } from '@mui/material';
+import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, RadioGroup, FormControlLabel, Radio, Typography, Switch, TextField, Divider, Slider, CircularProgress } from '@mui/material';
 import PresentationHome from './PresentationHome';
 import PresentationSlide from './PresentationSlide';
 import { parseChordProBlocks } from './chordproParser';
@@ -10,7 +10,7 @@ const PRESET_THEMES = {
   sepia: { bg: '#f4ebd9', text: '#4a3b32', chord: '#b35c00' },
 };
 
-export default function PresentationMode({ packetDetails, onClose }) {
+export default function PresentationMode({ packetDetails, isLoading, onClose }) {
   // Cache packet details for reloads
   const [cachedDetails, setCachedDetails] = useState(() => {
     try {
@@ -99,8 +99,16 @@ export default function PresentationMode({ packetDetails, onClose }) {
   });
 
   const [autoChorus, setAutoChorus] = useState(() => {
-    return localStorage.getItem('presentationAutoChorus') === 'true';
+    return localStorage.getItem('presentationAutoChorus') !== 'false';
   });
+
+  const [fullSongMode, setFullSongMode] = useState(() => {
+    return localStorage.getItem('presentationFullSongMode') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('presentationFullSongMode', fullSongMode);
+  }, [fullSongMode]);
 
   useEffect(() => {
     localStorage.setItem('presentationShowChords', showChords);
@@ -137,7 +145,7 @@ export default function PresentationMode({ packetDetails, onClose }) {
     localStorage.removeItem('presentationSlideSongId');
   };
 
-  const handleAutoSize = () => {
+  const handleAutoSize = () => { console.log("handleAutoSize RUNNING");
     if (!activeSong) return;
     
     const rawText = activeSong.chordpro_override || activeSong.chordpro_text || '';
@@ -147,6 +155,7 @@ export default function PresentationMode({ packetDetails, onClose }) {
     const wh = window.innerHeight;
     const ww = window.innerWidth;
     const availableWidthPx = Math.max(300, ww - 48); // 24px padding left & right
+    
     const availablePx = wh - 240;
 
     let bestMultiplier = 1.0;
@@ -200,7 +209,7 @@ export default function PresentationMode({ packetDetails, onClose }) {
     setTextSizeMultiplier(Math.round(bestMultiplier * 10) / 10);
   };
 
-  // Automatically compute optimal text size when a song is navigated to (or showChords changes)
+  // Automatically compute optimal text size when a song is navigated to (or layout modes change)
   useEffect(() => {
     if (activeSong) {
       handleAutoSize();
@@ -209,7 +218,12 @@ export default function PresentationMode({ packetDetails, onClose }) {
 
   return (
     <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1200, bgcolor: customColors.bg }}>
-      {!activeSong ? (
+      {isLoading ? (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: customColors.text }}>
+          <CircularProgress size={60} thickness={4} sx={{ color: customColors.chord, mb: 4 }} />
+          <Typography variant="h5" sx={{ fontWeight: 500 }}>Loading Songs...</Typography>
+        </Box>
+      ) : !activeSong ? (
         <PresentationHome 
           songs={activeDetails} 
           showHeaders={showHeaders}
@@ -229,6 +243,8 @@ export default function PresentationMode({ packetDetails, onClose }) {
           setShowChords={setShowChords}
           autoChorus={autoChorus}
           setAutoChorus={setAutoChorus}
+          fullSongMode={fullSongMode}
+          setFullSongMode={setFullSongMode}
           onOpenSettings={() => setSettingsOpen(true)}
         />
       )}

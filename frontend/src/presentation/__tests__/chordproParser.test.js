@@ -33,7 +33,26 @@ Praising God and
 having grace with all the people`;
 
     const blocks = parseChordProBlocks(text);
-    expect(blocks).toHaveLength(1);
+    expect(blocks).toHaveLength(2);
     expect(blocks[0].label).toEqual('');
+    expect(blocks[1].label).toEqual('');
+  });
+
+  it('ignores comment lines starting with # in songs without explicit section headers (Song 4)', () => {
+    const text = `#Capo 3
+
+[G]Oh what a [D]mystery! [Em]Christ in you, [C]Christ in me!
+[G]Oh what a [D]victory! [Em]Christ in you, [C]Christ in me!
+
+[G]Christ is in [D]you,
+though the [Em]body’s dead be[C]cause of sin.
+[G]The spirit’s [D]life because of [Em]righteousness[C].
+#Romans 8:10`;
+
+    const blocks = parseChordProBlocks(text);
+    expect(blocks).toHaveLength(2);
+    const allLyrics = blocks.flatMap(b => b.lines.map(l => l.lyric));
+    expect(allLyrics).not.toContain('#Capo 3');
+    expect(allLyrics).not.toContain('#Romans 8:10');
   });
 });

@@ -7,8 +7,13 @@ export function chordproToLines(chordproText) {
     // python rstrip('\n') equivalent
     // Note: split('\n') already removes the newline, but we'll trim carriage returns just in case
     const line = rawLine.replace(/\r$/, '');
+    const trimmed = line.trim();
     
-    if (!line.trim()) {
+    if (trimmed.startsWith('#')) {
+      continue;
+    }
+    
+    if (!trimmed) {
       rendered.push({ chord: '', lyric: '' });
       continue;
     }
