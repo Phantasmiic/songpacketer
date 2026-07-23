@@ -4,6 +4,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SearchIcon from '@mui/icons-material/Search';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import FullscreenButton from './FullscreenButton';
 
 export default function PresentationHome({ 
   songs, 
@@ -177,6 +178,7 @@ export default function PresentationHome({
           }}
         />
 
+        <FullscreenButton textColor={textColor} />
         <IconButton onClick={onOpenSettings} title="Settings" sx={{ color: textColor }}>
           <SettingsIcon />
         </IconButton>

@@ -7,8 +7,7 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import BugReportIcon from '@mui/icons-material/BugReport';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
+import FullscreenButton from './FullscreenButton';
 import { parseChordProBlocks } from './chordproParser';
 
 // Chromatic scales for chord transposition
@@ -132,7 +131,6 @@ export default function PresentationSlide({
   const [chordShift, setChordShift] = useState(song.capo || 0);
   const [debugCopied, setDebugCopied] = useState(false);
   const [showControls, setShowControls] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const alwaysShowControls = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -144,26 +142,6 @@ export default function PresentationSlide({
   }, []);
 
   const effectiveShowControls = alwaysShowControls || showControls;
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-    }
-  };
 
   useEffect(() => {
     let timer = null;
@@ -635,11 +613,7 @@ export default function PresentationSlide({
             </IconButton>
           )}
 
-          <Tooltip title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"} enterDelay={0} arrow>
-            <IconButton onClick={toggleFullscreen} sx={{ color: textColor }}>
-              {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-            </IconButton>
-          </Tooltip>
+          <FullscreenButton textColor={textColor} />
 
           <Tooltip title={debugCopied ? "Copied debug JSON!" : "Copy Debug Info"} enterDelay={0} arrow>
             <IconButton 
