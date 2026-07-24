@@ -1786,9 +1786,20 @@ function App() {
               />
             }
             label={
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Save online with shareable URL
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Save online with shareable URL
+                </Typography>
+                <Tooltip
+                  title="Saved online URLs cannot be edited directly after saving. If you make future updates to this packet, save them under a new URL slug (for example: adding _v1, _v2)."
+                  arrow
+                  placement="top"
+                >
+                  <IconButton size="small" sx={{ p: 0.25, color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+                    <InfoIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
             }
           />
 
