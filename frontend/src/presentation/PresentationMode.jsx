@@ -410,13 +410,13 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
                   setSlideManualFontPx(val);
                 }}
                 onChangeCommitted={() => setIsDraggingTextSize(false)}
-                min={16}
-                max={80}
+                min={25}
+                max={110}
                 step={1}
                 marks={[
-                  { value: 16, label: '16px' },
-                  { value: 38, label: '38px' },
-                  { value: 80, label: '80px' }
+                  { value: 25, label: '25px' },
+                  { value: 65, label: '65px' },
+                  { value: 110, label: '110px' }
                 ]}
                 valueLabelDisplay="auto"
                 valueLabelFormat={(v) => `${Math.round(v)}px`}
