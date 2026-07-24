@@ -107,6 +107,7 @@ export default function PresentationSlide({
   onGoHome, 
   theme = { bg: '#000000', text: '#ffffff', chord: '#64b5f6' },
   slideManualFontPx,
+  slideAutoFontPx,
   isSlideAuto = true,
   setSlideAutoFontPx,
   showSlideLabels = false,
@@ -193,7 +194,7 @@ export default function PresentationSlide({
 
   const paginationOptions = useMemo(() => {
     const availablePx = windowHeight - 240; // Safely subtract padding and UI elements
-    const baseFontSizePx = slideManualFontPx || (4.5 * windowHeight / 100);
+    const baseFontSizePx = slideManualFontPx || slideAutoFontPx || Math.round(4.5 * windowHeight / 100);
     
     // A single text line uses about 1.5em line height + 8px margin bottom
     const lyricHeightPx = (baseFontSizePx * 1.5) + 8;
@@ -213,7 +214,7 @@ export default function PresentationSlide({
       availableWidthPx,
       fontSizePx: baseFontSizePx
     };
-  }, [windowHeight, slideManualFontPx, effectiveShowChords]);
+  }, [windowHeight, slideManualFontPx, slideAutoFontPx, effectiveShowChords]);
 
   // Parse blocks once (with optional chord transposition)
   const rawBlocks = useMemo(() => {
@@ -861,7 +862,7 @@ export default function PresentationSlide({
           </Box>
         ) : (
           /* Normal paginated mode */
-          <Box key="paginated-box" sx={{ fontSize: slideManualFontPx ? `${slideManualFontPx}px` : '4.5vh', fontWeight: 500, lineHeight: 1.5, textAlign: 'left', width: '100%', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+          <Box key="paginated-box" sx={{ fontSize: `${slideManualFontPx || slideAutoFontPx || Math.round(4.5 * windowHeight / 100)}px`, fontWeight: 500, lineHeight: 1.5, textAlign: 'left', width: '100%', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
             {currentBlock.lines.map((line, idx) => {
               const hasChord = Boolean(line.chord && line.chord.trim().length > 0);
               let displayLyric = line.lyric || ' ';

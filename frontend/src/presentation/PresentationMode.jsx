@@ -243,6 +243,7 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
           onGoHome={handleGoHome} 
           theme={customColors} 
           slideManualFontPx={slideManualFontPx}
+          slideAutoFontPx={slideAutoFontPx}
           isSlideAuto={isSlideAuto}
           setSlideAutoFontPx={setSlideAutoFontPx}
           showSlideLabels={showSlideLabels}
