@@ -20,6 +20,16 @@ function GenerateStep({
   setShowSectionHeadersInBody,
   showSectionHeadersInIndex,
   setShowSectionHeadersInIndex,
+  requireOnePagePerSong,
+  setRequireOnePagePerSong,
+  showPageNumbers = true,
+  setShowPageNumbers,
+  startingPageNumber = 1,
+  setStartingPageNumber,
+  pageNumberPrefix = 'S',
+  setPageNumberPrefix,
+  pdfFontSize = 11,
+  setPdfFontSize,
   error,
   manualOrderCards,
   onMoveManualCard,
@@ -41,15 +51,66 @@ function GenerateStep({
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: manualOrderCards.length > 0 ? '45% 55%' : '1fr' }, gap: 2 }}>
       <Paper elevation={2} sx={{ p: 3 }}>
         <Stack spacing={2.5}>
-          <Typography variant="h6">Generate Packet</Typography>
+          <Typography variant="h6">Packet Layout & PDF Settings</Typography>
           <Typography variant="body2" color="text.secondary">
-            Generate the final packet PDF with your current tune/capo selections.
+            Configure layout preferences, page boundaries, and song ordering.
           </Typography>
 
           {error && <Alert severity="error">{error}</Alert>}
 
           <Stack spacing={1.5}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.secondary' }}>PDF SETTINGS</Typography>
+            <Box sx={{ pb: 1 }}>
+              <TextField
+                label="Lyric Font Size (pt)"
+                type="number"
+                size="small"
+                value={pdfFontSize}
+                onChange={(e) => setPdfFontSize(Math.max(6, Math.min(24, parseFloat(e.target.value) || 11)))}
+                slotProps={{ htmlInput: { min: 6, max: 24, step: 0.5 } }}
+                sx={{ maxWidth: 180 }}
+              />
+            </Box>
+            <Stack spacing={1}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showPageNumbers}
+                    onChange={(event) => setShowPageNumbers(event.target.checked)}
+                  />
+                }
+                label="Show page numbers"
+              />
+              {showPageNumbers && (
+                <Stack direction="row" spacing={2} sx={{ pl: 4, pt: 0.5 }}>
+                  <TextField
+                    label="Prefix (e.g. S, Songs, Page)"
+                    size="small"
+                    value={pageNumberPrefix}
+                    onChange={(e) => setPageNumberPrefix(e.target.value)}
+                    sx={{ maxWidth: 180 }}
+                  />
+                  <TextField
+                    label="Starting Page Number"
+                    type="number"
+                    size="small"
+                    value={startingPageNumber}
+                    onChange={(e) => setStartingPageNumber(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    slotProps={{ htmlInput: { min: 1 } }}
+                    sx={{ maxWidth: 180 }}
+                  />
+                </Stack>
+              )}
+            </Stack>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={requireOnePagePerSong}
+                  onChange={(event) => setRequireOnePagePerSong(event.target.checked)}
+                />
+              }
+              label="Require each song to fit entirely on one page"
+            />
             <FormControlLabel
               control={
                 <Checkbox

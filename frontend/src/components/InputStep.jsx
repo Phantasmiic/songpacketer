@@ -242,6 +242,7 @@ function InputStep({
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2.5} justifyContent="center">
         <Box sx={{ flex: 1 }}>
           <Paper
+            data-testid="create-packet-card"
             elevation={2}
             sx={{
               p: 2.25,

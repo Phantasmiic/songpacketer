@@ -47,7 +47,12 @@ export async function renderSongPacketPdf(
   songsData,
   maintainOriginalOrder = false,
   showSectionHeadersInBody = false,
-  showSectionHeadersInIndex = true
+  showSectionHeadersInIndex = true,
+  requireOnePagePerSong = false,
+  showPageNumbers = true,
+  startingPageNumber = 1,
+  pageNumberPrefix = 'S',
+  pdfFontSize = 11
 ) {
   const doc = await PDFDocument.create();
   const lyricFont = await doc.embedFont(LYRIC_FONT_NAME);
@@ -67,7 +72,8 @@ export async function renderSongPacketPdf(
   }));
 
   const vMargin = 72;
-  const lineHeight = 14;
+  const userFontSize = Math.max(6, Math.min(24, pdfFontSize || TEXT_FONT_SIZE));
+  const lineHeight = userFontSize * (14.0 / 11.0);
   const centerX = PAGE_WIDTH / 2.0;
   const leftColumnWidth = centerX - LEFT_MARGIN;
   const rightColumnWidth = PAGE_WIDTH - RIGHT_MARGIN - centerX;
@@ -79,7 +85,7 @@ export async function renderSongPacketPdf(
   const preparedLayouts = {};
   songsList.forEach((song, songIndex) => {
     preparedLayouts[songIndex] = prepareSongLayout(
-      ctx, song, columnWidth, TEXT_FONT_SIZE, lineHeight, showSectionHeadersInBody
+      ctx, song, columnWidth, userFontSize, lineHeight, showSectionHeadersInBody, requireOnePagePerSong, usableHeight
     );
   });
 
@@ -112,7 +118,7 @@ export async function renderSongPacketPdf(
     entries.push({ title: song.title, number: songNumberMap[idx], is_section: song.is_section });
   }
   
-  entries.sort((a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
+  // Keep entries in sequential packet order (with sections and sequential song numbers)
   
   const indexTop = PAGE_HEIGHT - vMargin;
   const indexBottom = vMargin;
@@ -225,7 +231,10 @@ export async function renderSongPacketPdf(
   }
 
   function drawSongPageMarker(pageIndex) {
-    const text = `S${pageIndex + 1}`;
+    if (!showPageNumbers) return;
+    const pageNum = (startingPageNumber || 1) + pageIndex;
+    const prefix = pageNumberPrefix !== undefined ? pageNumberPrefix : 'S';
+    const text = `${prefix}${pageNum}`;
     const tw = ctx.measureText(text, 'chord', 10);
     currentPageObj.drawText(text, { x: PAGE_WIDTH / 2.0 - tw / 2.0, y: vMargin / 2, font: chordFont, size: 10 });
   }

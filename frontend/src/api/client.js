@@ -28,13 +28,23 @@ export async function generatePacketPdf(
   selections,
   maintainOriginalOrder = false,
   showSectionHeadersInBody = false,
-  showSectionHeadersInIndex = true
+  showSectionHeadersInIndex = true,
+  requireOnePagePerSong = false,
+  showPageNumbers = true,
+  startingPageNumber = 1,
+  pageNumberPrefix = 'S',
+  pdfFontSize = 11
 ) {
   return await renderSongPacketPdf(
     selections,
     maintainOriginalOrder,
     showSectionHeadersInBody,
-    showSectionHeadersInIndex
+    showSectionHeadersInIndex,
+    requireOnePagePerSong,
+    showPageNumbers,
+    startingPageNumber,
+    pageNumberPrefix,
+    pdfFontSize
   );
 }
 

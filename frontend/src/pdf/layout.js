@@ -43,7 +43,9 @@ export function prepareSongLayout(
   columnWidth,
   baseFontSize,
   baseLineHeight,
-  showSectionHeadersInBody = false
+  showSectionHeadersInBody = false,
+  requireOnePagePerSong = false,
+  usableHeight = 648
 ) {
   if (song.is_section) {
     if (!showSectionHeadersInBody) {
@@ -70,19 +72,35 @@ export function prepareSongLayout(
     };
   }
 
-  const baseRows = wrappedSongRows(ctx, song, columnWidth, baseFontSize);
-  const needsWrap = baseRows.length > songRows(song).length;
-  
-  const fontSize = needsWrap ? Math.max(1.0, baseFontSize - 1.0) : baseFontSize;
-  const rows = needsWrap ? wrappedSongRows(ctx, song, columnWidth, fontSize) : baseRows;
-  
-  const lineHeight = baseLineHeight - (baseFontSize - fontSize);
-  const blocks = splitIntoStanzaBlocks(rows);
-  const blockHeights = blocks.map(block => block.map(row => rowHeight(row, lineHeight)));
-  
-  const totalHeight = blockHeights.reduce((sum, block) => {
+  let currentFontSize = baseFontSize;
+  let baseRows = wrappedSongRows(ctx, song, columnWidth, currentFontSize);
+  let needsWrap = baseRows.length > songRows(song).length;
+
+  if (needsWrap && currentFontSize > 10) {
+    currentFontSize = Math.max(8.0, currentFontSize - 1.0);
+    baseRows = wrappedSongRows(ctx, song, columnWidth, currentFontSize);
+  }
+
+  let rows = baseRows;
+  let lineHeight = Math.max(9.5, baseLineHeight * (currentFontSize / Math.max(baseFontSize, 1)));
+  let blocks = splitIntoStanzaBlocks(rows);
+  let blockHeights = blocks.map(block => block.map(row => rowHeight(row, lineHeight)));
+  let totalHeight = blockHeights.reduce((sum, block) => {
     return sum + block.reduce((s, h) => s + h, 0);
   }, 0) + lineHeight;
+
+  if (requireOnePagePerSong) {
+    while (totalHeight > usableHeight && currentFontSize > 8.0) {
+      currentFontSize -= 0.5;
+      lineHeight = Math.max(9.5, baseLineHeight * (currentFontSize / Math.max(baseFontSize, 1)));
+      rows = wrappedSongRows(ctx, song, columnWidth, currentFontSize);
+      blocks = splitIntoStanzaBlocks(rows);
+      blockHeights = blocks.map(block => block.map(row => rowHeight(row, lineHeight)));
+      totalHeight = blockHeights.reduce((sum, block) => {
+        return sum + block.reduce((s, h) => s + h, 0);
+      }, 0) + lineHeight;
+    }
+  }
 
   return {
     rows,
@@ -90,7 +108,7 @@ export function prepareSongLayout(
     blockHeights,
     lineHeight,
     totalHeight,
-    fontSize,
+    fontSize: currentFontSize,
     forceNewPage: song.force_new_page || false
   };
 }

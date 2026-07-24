@@ -176,6 +176,11 @@ function App() {
   const [packetStats, setPacketStats] = useState(null);
   const [showSectionHeadersInBody, setShowSectionHeadersInBody] = useState(false);
   const [showSectionHeadersInIndex, setShowSectionHeadersInIndex] = useState(true);
+  const [requireOnePagePerSong, setRequireOnePagePerSong] = useState(false);
+  const [showPageNumbers, setShowPageNumbers] = useState(true);
+  const [startingPageNumber, setStartingPageNumber] = useState(1);
+  const [pageNumberPrefix, setPageNumberPrefix] = useState('S');
+  const [pdfFontSize, setPdfFontSize] = useState(11);
 
   const [packetMode, setPacketMode] = useState('new');
   const [packetTitle, setPacketTitle] = useState('');
@@ -427,7 +432,12 @@ function App() {
           payload,
           maintainOriginalOrder,
           showSectionHeadersInBody,
-          showSectionHeadersInIndex
+          showSectionHeadersInIndex,
+          requireOnePagePerSong,
+          showPageNumbers,
+          startingPageNumber,
+          pageNumberPrefix,
+          pdfFontSize
         );
         const blob = result.blob;
         const newUrl = window.URL.createObjectURL(blob);
@@ -442,7 +452,7 @@ function App() {
       }
     }, 1000);
 
-  }, [matches, manualOrderCards, maintainOriginalOrder, step]);
+  }, [matches, manualOrderCards, maintainOriginalOrder, showSectionHeadersInBody, showSectionHeadersInIndex, requireOnePagePerSong, showPageNumbers, startingPageNumber, pageNumberPrefix, pdfFontSize, step]);
 
   const primeVersionsCache = (rows) => {
     rows.forEach((row) => {
@@ -649,9 +659,15 @@ function App() {
     }
   };
 
+  const getDefaultVersion = (versions) => {
+    if (!Array.isArray(versions) || versions.length === 0) return null;
+    return versions.find(v => /\[[^\]]+\]/.test(v.lyrics_chordpro || v.chordpro_text || '')) || versions[0];
+  };
+
   const handleCreateAndMatch = async () => {
     setLoading(true);
     setError('');
+    await new Promise((r) => setTimeout(r, 30));
     try {
       const initialState = {
         packet_title: packetTitle.trim(),
@@ -674,15 +690,16 @@ function App() {
         data.results.map(async (row) => {
           const selectedSongId = row.selected?.song_id || row.candidates?.[0]?.song_id;
           const versions = selectedSongId ? await fetchVersionsCached(selectedSongId) : [];
+          const defaultVersion = getDefaultVersion(versions);
           return {
             ...row,
             selectedSongId,
             versions,
-            selectedVersionId: versions?.[0]?.id || '',
-            capo: versions?.[0]?.capo_default || 0,
-            defaultCapo: versions?.[0]?.capo_default || 0,
-            chordproOverride: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
-            defaultChordpro: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
+            selectedVersionId: defaultVersion?.id || '',
+            capo: defaultVersion?.capo_default || 0,
+            defaultCapo: defaultVersion?.capo_default || 0,
+            chordproOverride: defaultVersion?.lyrics_chordpro || defaultVersion?.chordpro_text || '',
+            defaultChordpro: defaultVersion?.lyrics_chordpro || defaultVersion?.chordpro_text || '',
             titleOverride: row.selected?.title || row.candidates?.[0]?.title || row.input || '',
           };
         })
@@ -774,6 +791,7 @@ function App() {
     const versions = selectedSongId ? await fetchVersionsCached(selectedSongId) : [];
     const selectedCandidate = candidates.find((candidate) => candidate.song_id === selectedSongId);
     const selectedTitle = matchResult.selected?.title || selectedCandidate?.title;
+    const defaultVersion = getDefaultVersion(versions);
 
     return {
       ...previousRow,
@@ -783,11 +801,11 @@ function App() {
       candidates,
       selectedSongId,
       versions,
-      selectedVersionId: versions?.[0]?.id || '',
-      capo: versions?.[0]?.capo_default || 0,
-      defaultCapo: versions?.[0]?.capo_default || 0,
-      chordproOverride: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
-      defaultChordpro: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
+      selectedVersionId: defaultVersion?.id || '',
+      capo: defaultVersion?.capo_default || 0,
+      defaultCapo: defaultVersion?.capo_default || 0,
+      chordproOverride: defaultVersion?.lyrics_chordpro || defaultVersion?.chordpro_text || '',
+      defaultChordpro: defaultVersion?.lyrics_chordpro || defaultVersion?.chordpro_text || '',
       titleOverride: selectedTitle || previousRow.titleOverride || previousRow.input || '',
     };
   };
@@ -809,12 +827,13 @@ function App() {
       const selectedCandidate = copy[rowIndex].candidates?.find(
         (candidate) => candidate.song_id === patch.selectedSongId
       );
+      const defaultVersion = getDefaultVersion(versions);
       copy[rowIndex].versions = versions;
-      copy[rowIndex].selectedVersionId = versions?.[0]?.id || '';
-      copy[rowIndex].capo = versions?.[0]?.capo_default || 0;
-      copy[rowIndex].defaultCapo = versions?.[0]?.capo_default || 0;
-      copy[rowIndex].chordproOverride = versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '';
-      copy[rowIndex].defaultChordpro = versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '';
+      copy[rowIndex].selectedVersionId = defaultVersion?.id || '';
+      copy[rowIndex].capo = defaultVersion?.capo_default || 0;
+      copy[rowIndex].defaultCapo = defaultVersion?.capo_default || 0;
+      copy[rowIndex].chordproOverride = defaultVersion?.lyrics_chordpro || defaultVersion?.chordpro_text || '';
+      copy[rowIndex].defaultChordpro = defaultVersion?.lyrics_chordpro || defaultVersion?.chordpro_text || '';
       copy[rowIndex].titleOverride =
         selectedCandidate?.title || copy[rowIndex].titleOverride || copy[rowIndex].input;
     } else if (patch.selectedVersionId && copy[rowIndex].versions?.length) {
@@ -968,16 +987,17 @@ function App() {
           data.results.map(async (row) => {
             const selectedSongId = row.selected?.song_id || row.candidates?.[0]?.song_id;
             const versions = selectedSongId ? await fetchVersionsCached(selectedSongId) : [];
+            const defaultVersion = getDefaultVersion(versions);
             return {
               ...row,
               type: 'song',
               selectedSongId,
               versions,
-              selectedVersionId: versions?.[0]?.id || '',
-              capo: versions?.[0]?.capo_default || 0,
-              defaultCapo: versions?.[0]?.capo_default || 0,
-              chordproOverride: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
-              defaultChordpro: versions?.[0]?.lyrics_chordpro || versions?.[0]?.chordpro_text || '',
+              selectedVersionId: defaultVersion?.id || '',
+              capo: defaultVersion?.capo_default || 0,
+              defaultCapo: defaultVersion?.capo_default || 0,
+              chordproOverride: defaultVersion?.lyrics_chordpro || defaultVersion?.chordpro_text || '',
+              defaultChordpro: defaultVersion?.lyrics_chordpro || defaultVersion?.chordpro_text || '',
               titleOverride: row.selected?.title || row.candidates?.[0]?.title || row.input || '',
             };
           })
@@ -1910,16 +1930,50 @@ function App() {
       ) : null}
 
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: 'stretch', gap: { xs: 3, lg: 0 } }}>
-        <Box sx={{ minWidth: 0, flexGrow: 1, mb: 2 }}>
-        {loading || isHydrating ? (
-          <Paper elevation={1} sx={{ p: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 350, borderRadius: 3, gap: 3 }}>
-            <CircularProgress size={56} thickness={4} />
-            <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 500 }}>
-              Processing & Loading Packet...
-            </Typography>
-          </Paper>
-        ) : (
-          <>
+        <Box sx={{ minWidth: 0, flexGrow: 1, mb: 2, position: 'relative' }}>
+          {(loading || isHydrating) && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'rgba(255, 255, 255, 0.75)',
+                backdropFilter: 'blur(3px)',
+                zIndex: 100,
+                minHeight: 350,
+                borderRadius: 3,
+                gap: 2,
+                transition: 'all 0.3s ease-in-out',
+              }}
+            >
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  border: '4px solid',
+                  borderColor: 'divider',
+                  borderTopColor: 'primary.main',
+                  animation: 'smoothSpin 0.75s linear infinite',
+                  willChange: 'transform',
+                  '@keyframes smoothSpin': {
+                    '0%': { transform: 'rotate(0deg)' },
+                    '100%': { transform: 'rotate(360deg)' },
+                  },
+                }}
+              />
+              <Typography variant="body1" color="text.primary" sx={{ fontWeight: 600 }}>
+                Processing & Loading Packet...
+              </Typography>
+            </Box>
+          )}
+          <Box sx={{ opacity: loading || isHydrating ? 0.35 : 1, transition: 'opacity 0.25s ease-in-out', pointerEvents: loading || isHydrating ? 'none' : 'auto' }}>
             {step === 0 && (
               <InputStep
                 packetTitle={packetTitle}
@@ -1959,6 +2013,16 @@ function App() {
                 setShowSectionHeadersInBody={handleShowSectionHeadersInBodyChange}
                 showSectionHeadersInIndex={showSectionHeadersInIndex}
                 setShowSectionHeadersInIndex={handleShowSectionHeadersInIndexChange}
+                requireOnePagePerSong={requireOnePagePerSong}
+                setRequireOnePagePerSong={setRequireOnePagePerSong}
+                showPageNumbers={showPageNumbers}
+                setShowPageNumbers={setShowPageNumbers}
+                startingPageNumber={startingPageNumber}
+                setStartingPageNumber={setStartingPageNumber}
+                pageNumberPrefix={pageNumberPrefix}
+                setPageNumberPrefix={setPageNumberPrefix}
+                pdfFontSize={pdfFontSize}
+                setPdfFontSize={setPdfFontSize}
                 error={error}
                 manualOrderCards={manualOrderCards}
                 onMoveManualCard={handleMoveManualCard}
@@ -1974,8 +2038,7 @@ function App() {
                 onGoBack={() => setStep(1)}
               />
             )}
-          </>
-        )}
+          </Box>
         </Box>
         {step > 0 && activePacket ? (
           <Box sx={{ display: { xs: 'none', lg: 'contents' } }}>
