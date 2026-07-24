@@ -1755,7 +1755,17 @@ function App() {
           horizontal: 'right',
         }}
         PaperProps={{
-          sx: { width: 360, p: 2.5, borderRadius: 2, boxShadow: 3 }
+          sx: { 
+            width: 360, 
+            p: 2.5, 
+            borderRadius: 2.5, 
+            boxShadow: 8,
+            bgcolor: 'background.paper',
+            backgroundImage: 'none',
+            border: '1px solid',
+            borderColor: 'divider',
+            opacity: 1,
+          }
         }}
       >
         <Stack spacing={2}>
@@ -1794,6 +1804,26 @@ function App() {
                   title="Packets saved to a URL cannot be edited online once created. However, you can continue editing your packet locally anytime and save it at a new URL (for example: adding _v1, _v2 to the URL)."
                   arrow
                   placement="top"
+                  slotProps={{
+                    popper: {
+                      sx: {
+                        '& .MuiTooltip-tooltip': {
+                          bgcolor: '#0f172a',
+                          color: '#ffffff',
+                          fontSize: '0.825rem',
+                          lineHeight: 1.45,
+                          p: 1.5,
+                          borderRadius: 2,
+                          boxShadow: 8,
+                          border: '1px solid #334155',
+                          opacity: 1,
+                        },
+                        '& .MuiTooltip-arrow': {
+                          color: '#0f172a',
+                        },
+                      },
+                    },
+                  }}
                 >
                   <IconButton size="small" sx={{ p: 0.25, color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
                     <InfoIcon sx={{ fontSize: 16 }} />
