@@ -106,7 +106,9 @@ export default function PresentationSlide({
   song, 
   onGoHome, 
   theme = { bg: '#000000', text: '#ffffff', chord: '#64b5f6' },
-  textSizeMultiplier = 1.0,
+  slideManualFontPx,
+  isSlideAuto = true,
+  setSlideAutoFontPx,
   showSlideLabels = false,
   showChords,
   setShowChords,
@@ -114,6 +116,12 @@ export default function PresentationSlide({
   setAutoChorus,
   fullSongMode,
   setFullSongMode,
+  fullSongFontPx: parentFullSongFontPx,
+  setFullSongFontPx: setParentFullSongFontPx,
+  fullSongManualFontPx,
+  setFullSongManualFontPx,
+  isFullSongAuto = true,
+  setIsFullSongAuto,
   onOpenSettings 
 }) {
   const effectiveShowChords = fullSongMode ? false : showChords;
@@ -167,8 +175,15 @@ export default function PresentationSlide({
   const bgColor = theme.bg || '#000000';
   const textColor = theme.text || '#ffffff';
   const chordColor = theme.chord || '#64b5f6';
-
+  // Window height tracking for font auto-scaling
   const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
+  const calculatedSlidePx = Math.round(windowHeight * 0.045);
+
+  useEffect(() => {
+    if (typeof setSlideAutoFontPx === 'function') {
+      setSlideAutoFontPx(calculatedSlidePx);
+    }
+  }, [calculatedSlidePx, setSlideAutoFontPx]);
 
   useEffect(() => {
     const handleResize = () => setWindowHeight(window.innerHeight);
@@ -178,7 +193,7 @@ export default function PresentationSlide({
 
   const paginationOptions = useMemo(() => {
     const availablePx = windowHeight - 240; // Safely subtract padding and UI elements
-    const baseFontSizePx = (4.5 * windowHeight / 100) * textSizeMultiplier;
+    const baseFontSizePx = slideManualFontPx || (4.5 * windowHeight / 100);
     
     // A single text line uses about 1.5em line height + 8px margin bottom
     const lyricHeightPx = (baseFontSizePx * 1.5) + 8;
@@ -198,7 +213,7 @@ export default function PresentationSlide({
       availableWidthPx,
       fontSizePx: baseFontSizePx
     };
-  }, [windowHeight, textSizeMultiplier, effectiveShowChords]);
+  }, [windowHeight, slideManualFontPx, effectiveShowChords]);
 
   // Parse blocks once (with optional chord transposition)
   const rawBlocks = useMemo(() => {
@@ -211,6 +226,13 @@ export default function PresentationSlide({
   const fullSongRef = useRef(null);
   const [fullSongFontPx, setFullSongFontPx] = useState(16);
   const [fullSongColumns, setFullSongColumns] = useState('auto');
+
+  const updateFullSongFontPx = useCallback((size) => {
+    setFullSongFontPx(size);
+    if (typeof setParentFullSongFontPx === 'function') {
+      setParentFullSongFontPx(size);
+    }
+  }, [setParentFullSongFontPx]);
 
 
   const hasChorus = useMemo(() => rawBlocks.some(b => b.type === 'chorus'), [rawBlocks]);
@@ -272,59 +294,196 @@ export default function PresentationSlide({
   }, [rawBlocks]);
 
   // DOM-measurement auto-sizing for full song mode.
-  // Binary search for the largest font-size (px) where the content doesn't overflow.
-  // We use a ResizeObserver to re-run layout checks whenever the container size changes.
+  // Direct Multi-Column Search with Quality Scoring & Font Wiggle Room (15%):
+  // 1. Evaluates candidate column counts C = 1..C_max to find max fitting font size for each C.
+  // 2. Filters candidates to those within 15% font-size wiggle room of the absolute max font.
+  // 3. Scores candidates: score = fontSize - (lineWraps * 2.0) - (blockSplits * 4.0).
+  // 4. Selects the candidate with the highest quality score (prioritizing unbroken verses/choruses and fewer line wraps).
   useEffect(() => {
     if (!fullSongMode || !fullSongRef.current) return;
 
     const el = fullSongRef.current;
 
-    const resizeObserver = new ResizeObserver(() => {
+    const measureLayout = () => {
       // Temporarily remove overflow:hidden so we can measure true scroll dimensions
       el.style.overflow = 'auto';
 
-      const fits = (sizePx) => {
-        el.style.fontSize = `${sizePx}px`;
-        const colWidthPx = optimalColumnWidthEm * sizePx;
-        const colGapPx = 1.2 * sizePx;
-        const maxCols = Math.max(1, Math.floor((el.clientWidth + colGapPx) / (colWidthPx + colGapPx)));
-        el.style.columnCount = maxCols;
-        // Force reflow
-        void el.offsetHeight;
-        // With CSS columns, overflow shows as scrollWidth > clientWidth (extra columns)
-        // or scrollHeight > clientHeight (content too tall for a single column to fill)
-        return el.scrollWidth <= el.clientWidth + 2 && el.scrollHeight <= el.clientHeight + 2;
-      };
+      const containerWidth = el.clientWidth;
+      const containerHeight = el.clientHeight;
 
-      let lo = 6;
-      let hi = 80;
-      let best = lo;
+      if (!containerWidth || !containerHeight) return;
 
-      // Binary search: find the largest font that fits
-      while (hi - lo > 0.5) {
-        const mid = (lo + hi) / 2;
-        if (fits(mid)) {
-          best = mid;
-          lo = mid;
+      // Determine maximum candidate columns based on screen width (min 220px per column)
+      const maxCandidateCols = Math.min(5, Math.max(1, Math.floor((containerWidth + 30) / 250)));
+
+      // If in manual font size mode, run layout search with the fixed target font size
+      if (!isFullSongAuto && fullSongManualFontPx) {
+        const targetFont = fullSongManualFontPx;
+        const eligibleCandidates = [];
+
+        for (let c = 1; c <= maxCandidateCols; c++) {
+          el.style.columnCount = c;
+          el.style.fontSize = `${targetFont}px`;
+          el.style.columnGap = '1.5em';
+          void el.offsetHeight;
+
+          const fits = el.scrollWidth <= containerWidth + 2 && el.scrollHeight <= containerHeight + 2;
+          if (fits) {
+            const lineBoxes = el.querySelectorAll('[data-line]');
+            let lineWraps = 0;
+            lineBoxes.forEach(lineEl => {
+              const h = lineEl.getBoundingClientRect().height;
+              const approxLineH = targetFont * 1.35;
+              if (h > approxLineH * 1.4) {
+                lineWraps += Math.max(1, Math.round(h / approxLineH) - 1);
+              }
+            });
+
+            const blockBoxes = el.querySelectorAll('[data-block]');
+            let blockSplits = 0;
+            blockBoxes.forEach(blockEl => {
+              if (blockEl.getClientRects().length > 1) blockSplits++;
+            });
+
+            const score = targetFont - (lineWraps * 2.0) - (blockSplits * 4.0);
+            eligibleCandidates.push({ cols: c, fontSize: targetFont, score });
+          }
+        }
+
+        let winningCandidate = eligibleCandidates[0];
+        if (eligibleCandidates.length > 0) {
+          winningCandidate = eligibleCandidates.reduce((best, curr) => curr.score > best.score ? curr : best, eligibleCandidates[0]);
         } else {
-          hi = mid;
+          winningCandidate = { cols: maxCandidateCols, fontSize: targetFont };
+        }
+
+        updateFullSongFontPx(targetFont);
+        setFullSongColumns(winningCandidate.cols);
+
+        el.style.fontSize = `${targetFont}px`;
+        el.style.columnCount = winningCandidate.cols;
+        el.style.columnGap = '1.5em';
+        el.style.overflow = 'hidden';
+        return;
+      }
+
+      const candidates = [];
+      let absoluteMaxFont = 6;
+
+      // 1. Evaluate max font size for each candidate column count C
+      for (let c = 1; c <= maxCandidateCols; c++) {
+        el.style.columnCount = c;
+        el.style.columnGap = '1.5em';
+
+        const fits = (sizePx) => {
+          el.style.fontSize = `${sizePx}px`;
+          void el.offsetHeight;
+          return el.scrollWidth <= containerWidth + 2 && el.scrollHeight <= containerHeight + 2;
+        };
+
+        let lo = 6;
+        let hi = 90;
+        let bestForC = lo;
+
+        while (hi - lo > 0.5) {
+          const mid = (lo + hi) / 2;
+          if (fits(mid)) {
+            bestForC = mid;
+            lo = mid;
+          } else {
+            hi = mid;
+          }
+        }
+
+        if (bestForC > 6) {
+          candidates.push({ cols: c, fontSize: bestForC });
+          if (bestForC > absoluteMaxFont) {
+            absoluteMaxFont = bestForC;
+          }
         }
       }
 
-      const finalSize = Math.floor(best * 2) / 2; // round to nearest 0.5
-      setFullSongFontPx(finalSize);
-      const colWidthPx = optimalColumnWidthEm * finalSize;
-      const colGapPx = 1.2 * finalSize;
-      const finalCols = Math.max(1, Math.floor((el.clientWidth + colGapPx) / (colWidthPx + colGapPx)));
-      setFullSongColumns(finalCols);
-      el.style.fontSize = `${finalSize}px`;
-      el.style.columnCount = finalCols;
-      el.style.overflow = 'hidden';
-    });
+      if (candidates.length === 0) return;
 
+      // 2. Evaluate quality score for font sizes within 15% wiggle room across candidate column counts
+      const minFontThreshold = absoluteMaxFont * 0.85; // 15% wiggle room
+
+      const evalCandidates = [];
+      candidates.forEach(cand => {
+        if (cand.fontSize >= minFontThreshold) {
+          const maxF = Math.floor(cand.fontSize);
+          const minF = Math.ceil(minFontThreshold);
+          for (let f = maxF; f >= minF; f -= 1) {
+            evalCandidates.push({ cols: cand.cols, fontSize: f });
+          }
+        }
+      });
+
+      if (evalCandidates.length === 0) {
+        evalCandidates.push(candidates[0]);
+      }
+
+      let bestScore = -Infinity;
+      let winningCandidate = evalCandidates[0];
+
+      evalCandidates.forEach(cand => {
+        el.style.columnCount = cand.cols;
+        el.style.fontSize = `${cand.fontSize}px`;
+        el.style.columnGap = '1.5em';
+        void el.offsetHeight;
+
+        // Measure line wraps
+        const lineBoxes = el.querySelectorAll('[data-line]');
+        let lineWraps = 0;
+        lineBoxes.forEach(lineEl => {
+          const h = lineEl.getBoundingClientRect().height;
+          const approxLineH = cand.fontSize * 1.35;
+          if (h > approxLineH * 1.4) {
+            lineWraps += Math.max(1, Math.round(h / approxLineH) - 1);
+          }
+        });
+
+        // Measure block column splits (verse/chorus breaks across columns)
+        const blockBoxes = el.querySelectorAll('[data-block]');
+        let blockSplits = 0;
+        blockBoxes.forEach(blockEl => {
+          const rects = blockEl.getClientRects();
+          if (rects.length > 1) {
+            blockSplits += (rects.length - 1);
+          }
+        });
+
+        // Quality Score: Font Size minus penalties for line wraps (2.5pt) and block splits (6.0pt)
+        const qualityScore = cand.fontSize - (lineWraps * 2.5) - (blockSplits * 6.0);
+
+        if (qualityScore > bestScore) {
+          bestScore = qualityScore;
+          winningCandidate = cand;
+        }
+      });
+
+      const finalSize = Math.floor(winningCandidate.fontSize * 2) / 2; // round to nearest 0.5
+      updateFullSongFontPx(finalSize);
+      setFullSongColumns(winningCandidate.cols);
+
+      el.style.fontSize = `${finalSize}px`;
+      el.style.columnCount = winningCandidate.cols;
+      el.style.columnGap = '1.5em';
+      el.style.overflow = 'hidden';
+    };
+
+    const resizeObserver = new ResizeObserver(measureLayout);
     resizeObserver.observe(el);
+
+    // Re-measure when web fonts finish loading (fixes Cmd+Shift+R hard reload font race condition)
+    if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        measureLayout();
+      });
+    }
+
     return () => resizeObserver.disconnect();
-  }, [fullSongMode, presentationSequence, optimalColumnWidthEm]);
+  }, [fullSongMode, presentationSequence, isFullSongAuto, fullSongManualFontPx]);
 
   // Pre-calculate slide metadata for grouping bars
   const slideMetas = useMemo(() => {
@@ -608,7 +767,7 @@ export default function PresentationSlide({
           </Tooltip>
 
           {onOpenSettings && (
-            <IconButton onClick={onOpenSettings} sx={{ color: textColor }}>
+            <IconButton onClick={onOpenSettings} title="Settings" aria-label="Settings" sx={{ color: textColor }}>
               <SettingsIcon />
             </IconButton>
           )}
@@ -655,6 +814,7 @@ export default function PresentationSlide({
           /* Full Song Mode: fixed-height container, auto columns, DOM-measured font size */
           <Box
             key="full-song-box"
+            data-testid="full-song-box"
             ref={fullSongRef}
             sx={{
               fontWeight: 500,
@@ -671,7 +831,7 @@ export default function PresentationSlide({
             }}
           >
             {presentationSequence.map((block, blockIdx) => (
-              <Box key={blockIdx} sx={{ mb: '1.2em', breakInside: 'avoid-column' }}>
+              <Box key={blockIdx} data-block sx={{ mb: '1.2em', breakInside: 'avoid-column' }}>
                 {block.label && (
                   <Box sx={{
                     fontWeight: 700,
@@ -691,7 +851,7 @@ export default function PresentationSlide({
                     displayLyric = displayLyric.replace(/^(verse\s*\d*[:\.\)]?\s*|v\s*\d+[:\.\)]?\s*|chorus\s*\d*[:\.\)]?\s*|bridge\s*\d*[:\.\)]?\s*|\d+[:\.\)]?\s+)/i, '');
                   }
                   return (
-                    <Box key={idx} sx={{ whiteSpace: 'pre-wrap', minHeight: '1.1em' }}>
+                    <Box key={idx} data-line sx={{ whiteSpace: 'pre-wrap', minHeight: '1.1em' }}>
                       {displayLyric}
                     </Box>
                   );
@@ -701,7 +861,7 @@ export default function PresentationSlide({
           </Box>
         ) : (
           /* Normal paginated mode */
-          <Box key="paginated-box" sx={{ fontSize: `calc(${textSizeMultiplier} * 4.5vh)`, fontWeight: 500, lineHeight: 1.5, textAlign: 'left', width: '100%', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+          <Box key="paginated-box" sx={{ fontSize: slideManualFontPx ? `${slideManualFontPx}px` : '4.5vh', fontWeight: 500, lineHeight: 1.5, textAlign: 'left', width: '100%', fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
             {currentBlock.lines.map((line, idx) => {
               const hasChord = Boolean(line.chord && line.chord.trim().length > 0);
               let displayLyric = line.lyric || ' ';

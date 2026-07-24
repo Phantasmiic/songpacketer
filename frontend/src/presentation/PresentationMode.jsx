@@ -120,7 +120,12 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
   
   const [showHeaders, setShowHeaders] = useState(false); // Default: do not show section headers
   const [showSlideLabels, setShowSlideLabels] = useState(false); // Default: do not show slide section labels
-  const [textSizeMultiplier, setTextSizeMultiplier] = useState(1.0); // Global text scale
+  const [slideManualFontPx, setSlideManualFontPx] = useState(null); // Slide manual font px
+  const [isSlideAuto, setIsSlideAuto] = useState(true); // Slide auto font size toggle
+  const [slideAutoFontPx, setSlideAutoFontPx] = useState(() => Math.round((typeof window !== 'undefined' ? window.innerHeight : 800) * 0.045));
+  const [fullSongFontPx, setFullSongFontPx] = useState(36); // Full song current calculated font size
+  const [fullSongManualFontPx, setFullSongManualFontPx] = useState(null); // Full song manual font size
+  const [isFullSongAuto, setIsFullSongAuto] = useState(true); // Full song auto font size toggle
 
   const handlePresetChange = (mode) => {
     setThemeMode(mode);
@@ -205,8 +210,8 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
         }
       }
     }
-    
-    setTextSizeMultiplier(Math.round(bestMultiplier * 10) / 10);
+    const calculatedPx = Math.round((4.5 * wh / 100) * bestMultiplier);
+    setSlideAutoFontPx(calculatedPx);
   };
 
   // Automatically compute optimal text size when a song is navigated to (or layout modes change)
@@ -237,7 +242,9 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
           song={activeSong} 
           onGoHome={handleGoHome} 
           theme={customColors} 
-          textSizeMultiplier={textSizeMultiplier}
+          slideManualFontPx={slideManualFontPx}
+          isSlideAuto={isSlideAuto}
+          setSlideAutoFontPx={setSlideAutoFontPx}
           showSlideLabels={showSlideLabels}
           showChords={showChords}
           setShowChords={setShowChords}
@@ -245,6 +252,12 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
           setAutoChorus={setAutoChorus}
           fullSongMode={fullSongMode}
           setFullSongMode={setFullSongMode}
+          fullSongFontPx={fullSongFontPx}
+          setFullSongFontPx={setFullSongFontPx}
+          fullSongManualFontPx={fullSongManualFontPx}
+          setFullSongManualFontPx={setFullSongManualFontPx}
+          isFullSongAuto={isFullSongAuto}
+          setIsFullSongAuto={setIsFullSongAuto}
           onOpenSettings={() => setSettingsOpen(true)}
         />
       )}
@@ -351,49 +364,120 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
             <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 'bold' }}>Slide Display Options</Typography>
           </Box>
           
-          {/* Global Text Size Slider */}
-          <Box 
-            sx={{ 
-              mb: 3, 
-              p: 1.5, 
-              borderRadius: 2, 
-              bgcolor: isDraggingTextSize ? 'transparent' : 'transparent',
-              transition: 'all 0.2s',
-              position: 'relative',
-              zIndex: 10
-            }}
-            onMouseDown={() => setIsDraggingTextSize(true)}
-            onTouchStart={() => setIsDraggingTextSize(true)}
-            onMouseUp={() => setIsDraggingTextSize(false)}
-            onTouchEnd={() => setIsDraggingTextSize(false)}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>Global Text Size</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Button size="small" variant="outlined" onClick={handleAutoSize} sx={{ py: 0, minWidth: 0, textTransform: 'none', height: 24 }}>
-                  Auto
-                </Button>
-                <Typography variant="body2" sx={{ fontWeight: 700, minWidth: '32px', textAlign: 'right' }}>
-                  {Number(textSizeMultiplier).toFixed(1)}x
-                </Typography>
+          {/* Text Size Slider (Slide Mode vs Full Song Mode) */}
+          {!fullSongMode ? (
+            <Box 
+              sx={{ 
+                mb: 3, 
+                p: 1.5, 
+                borderRadius: 2, 
+                bgcolor: isDraggingTextSize ? 'transparent' : 'transparent',
+                transition: 'all 0.2s',
+                position: 'relative',
+                zIndex: 10
+              }}
+              onMouseDown={() => setIsDraggingTextSize(true)}
+              onTouchStart={() => setIsDraggingTextSize(true)}
+              onMouseUp={() => setIsDraggingTextSize(false)}
+              onTouchEnd={() => setIsDraggingTextSize(false)}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Slide Text Size</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Button 
+                    size="small" 
+                    variant={isSlideAuto ? 'contained' : 'outlined'} 
+                    onClick={() => {
+                      setIsSlideAuto(true);
+                      setSlideManualFontPx(null);
+                    }} 
+                    sx={{ py: 0, minWidth: 0, textTransform: 'none', height: 24 }}
+                  >
+                    Auto
+                  </Button>
+                  <Typography variant="body2" sx={{ fontWeight: 700, minWidth: '70px', textAlign: 'right' }}>
+                    {isSlideAuto 
+                      ? `${Math.round(slideAutoFontPx || 38)}px (Auto)` 
+                      : `${Math.round(slideManualFontPx || slideAutoFontPx || 38)}px`}
+                  </Typography>
+                </Box>
               </Box>
+              <Slider
+                value={isSlideAuto ? (slideAutoFontPx || 38) : (slideManualFontPx || slideAutoFontPx || 38)}
+                onChange={(e, val) => {
+                  setIsSlideAuto(false);
+                  setSlideManualFontPx(val);
+                }}
+                onChangeCommitted={() => setIsDraggingTextSize(false)}
+                min={16}
+                max={80}
+                step={1}
+                marks={[
+                  { value: 16, label: '16px' },
+                  { value: 38, label: '38px' },
+                  { value: 80, label: '80px' }
+                ]}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(v) => `${Math.round(v)}px`}
+              />
             </Box>
-            <Slider
-              value={textSizeMultiplier}
-              onChange={(e, val) => setTextSizeMultiplier(val)}
-              onChangeCommitted={() => setIsDraggingTextSize(false)}
-              min={1.0}
-              max={3.5}
-              step={0.1}
-              marks={[
-                { value: 1.0, label: '1.0x' },
-                { value: 2.0, label: '2.0x' },
-                { value: 3.0, label: '3.0x' }
-              ]}
-              valueLabelDisplay="auto"
-              valueLabelFormat={(v) => `${Number(v).toFixed(1)}x`}
-            />
-          </Box>
+          ) : (
+            <Box 
+              sx={{ 
+                mb: 3, 
+                p: 1.5, 
+                borderRadius: 2, 
+                bgcolor: isDraggingTextSize ? 'transparent' : 'transparent',
+                transition: 'all 0.2s',
+                position: 'relative',
+                zIndex: 10
+              }}
+              onMouseDown={() => setIsDraggingTextSize(true)}
+              onTouchStart={() => setIsDraggingTextSize(true)}
+              onMouseUp={() => setIsDraggingTextSize(false)}
+              onTouchEnd={() => setIsDraggingTextSize(false)}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>Full Song Text Size</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Button 
+                    size="small" 
+                    variant={isFullSongAuto ? 'contained' : 'outlined'} 
+                    onClick={() => {
+                      setIsFullSongAuto(true);
+                      setFullSongManualFontPx(null);
+                    }} 
+                    sx={{ py: 0, minWidth: 0, textTransform: 'none', height: 24 }}
+                  >
+                    Auto
+                  </Button>
+                  <Typography variant="body2" sx={{ fontWeight: 700, minWidth: '70px', textAlign: 'right' }}>
+                    {isFullSongAuto 
+                      ? `${Math.round(fullSongFontPx || 32)}px (Auto)` 
+                      : `${Math.round(fullSongManualFontPx || fullSongFontPx || 32)}px`}
+                  </Typography>
+                </Box>
+              </Box>
+              <Slider
+                value={isFullSongAuto ? (fullSongFontPx || 32) : (fullSongManualFontPx || fullSongFontPx || 32)}
+                onChange={(e, val) => {
+                  setIsFullSongAuto(false);
+                  setFullSongManualFontPx(val);
+                }}
+                onChangeCommitted={() => setIsDraggingTextSize(false)}
+                min={14}
+                max={72}
+                step={1}
+                marks={[
+                  { value: 14, label: '14px' },
+                  { value: 36, label: '36px' },
+                  { value: 72, label: '72px' }
+                ]}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(v) => `${Math.round(v)}px`}
+              />
+            </Box>
+          )}
 
           <Box sx={{ opacity: isDraggingTextSize ? 0.1 : 1, transition: 'opacity 0.2s' }}>
             <FormControlLabel
