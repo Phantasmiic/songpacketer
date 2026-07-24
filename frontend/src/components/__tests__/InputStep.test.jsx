@@ -18,11 +18,20 @@ const DEFAULT_PROPS = {
 };
 
 describe('InputStep – landing picker menu', () => {
-  it('renders all three action cards by default', () => {
+  it('renders all four action cards including Present Songs by default', () => {
     render(<InputStep {...DEFAULT_PROPS} />);
     expect(screen.getByText('Create New Packet')).toBeInTheDocument();
     expect(screen.getByText('Open Saved Packet')).toBeInTheDocument();
     expect(screen.getByText('Import Backup File')).toBeInTheDocument();
+    expect(screen.getByText('Present Songs from Songbase')).toBeInTheDocument();
+    expect(screen.getByText('Search & present directly without creating a packet')).toBeInTheDocument();
+  });
+
+  it('calls onPresentSongs when Present Songs card is clicked', () => {
+    const onPresentSongs = vi.fn();
+    render(<InputStep {...DEFAULT_PROPS} onPresentSongs={onPresentSongs} />);
+    fireEvent.click(screen.getByText('Present Songs from Songbase'));
+    expect(onPresentSongs).toHaveBeenCalledTimes(1);
   });
 
   it('does not immediately show the create form on mount', () => {

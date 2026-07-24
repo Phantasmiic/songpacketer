@@ -25,6 +25,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SlideshowIcon from '@mui/icons-material/Slideshow';
 
 function InputStep({
   packetTitle,
@@ -36,6 +37,7 @@ function InputStep({
   onCreateAndMatch,
   onImportPacket,
   onDeletePacket,
+  onPresentSongs,
   loading,
 }) {
   const [activeView, setActiveView] = useState('menu'); // 'menu' | 'create' | 'open'
@@ -344,6 +346,46 @@ function InputStep({
           </Paper>
         </Box>
       </Stack>
+
+      <Divider sx={{ my: 3.5 }} />
+
+      <Box sx={{ maxWidth: 460, mx: 'auto' }}>
+        <Paper
+          data-testid="present-songs-card"
+          component="button"
+          elevation={2}
+          onClick={onPresentSongs}
+          sx={{
+            width: '100%',
+            p: 2.25,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            borderRadius: 2.5,
+            cursor: 'pointer',
+            border: '1px solid #e2e8f0',
+            background: 'inherit',
+            font: 'inherit',
+            textAlign: 'left',
+            transition: 'all 0.2s ease-in-out',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: 4,
+              borderColor: 'primary.main',
+            },
+          }}
+        >
+          <SlideshowIcon color="primary" sx={{ fontSize: 32, flexShrink: 0 }} />
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+              Present Songs from Songbase
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+              Search & present directly without creating a packet
+            </Typography>
+          </Box>
+        </Paper>
+      </Box>
     </Box>
   );
 }

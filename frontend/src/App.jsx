@@ -198,6 +198,61 @@ function App() {
   const [isPresentationMode, setIsPresentationMode] = useState(() => {
     return typeof window !== 'undefined' && window.location.pathname.startsWith('/present');
   });
+  const [isSongbasePresenting, setIsSongbasePresenting] = useState(false);
+  const [songbaseSongs, setSongbaseSongs] = useState([]);
+
+  const handlePresentSongs = async () => {
+    try {
+      setLoading(true);
+      let formatted = [];
+      try {
+        const db = await getDb();
+        if (db && db.objectStoreNames && db.objectStoreNames.contains('songs')) {
+          let allSongs = await db.getAll('songs');
+
+          if ((!allSongs || allSongs.length === 0) && typeof syncSongbase === 'function') {
+            try {
+              await Promise.race([
+                syncSongbase(),
+                new Promise((resolve) => setTimeout(resolve, 1500))
+              ]);
+              allSongs = await db.getAll('songs');
+            } catch (syncErr) {
+              console.warn('Sync skipped or timed out in handlePresentSongs', syncErr);
+            }
+          }
+
+          formatted = (allSongs || []).map((song) => {
+            return {
+              song_id: String(song.id),
+              title: song.title,
+              key: song.key,
+              chordpro_override: song.lyrics_chordpro || song.lyrics_plain || '',
+              capo: song.capo_default || 0,
+            };
+          });
+
+          formatted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+        }
+      } catch (dbErr) {
+        console.warn('DB songs fetch warning in handlePresentSongs', dbErr);
+      }
+
+      localStorage.removeItem('presentationActiveSongId');
+      localStorage.removeItem('presentationSlideIndex');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/present') {
+        window.history.pushState({}, '', '/present');
+      }
+      setSongbaseSongs(formatted);
+      setIsSongbasePresenting(true);
+      setIsPresentationMode(true);
+    } catch (err) {
+      console.error('Failed to load songs for presentation', err);
+      setError('Failed to load Songbase library for presentation');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Automatically format custom slug when popover opens or packet title changes
   useEffect(() => {
@@ -1835,6 +1890,7 @@ function App() {
                 onCreateAndMatch={handleCreateAndMatch}
                 onImportPacket={handleImportPacket}
                 onDeletePacket={handleDeletePacket}
+                onPresentSongs={handlePresentSongs}
                 loading={loading}
               />
             )}
@@ -1902,8 +1958,12 @@ function App() {
       {isPresentationMode && (
         <PresentationMode
           isLoading={isHydrating}
-          packetDetails={toSelections(manualOrderCards.length > 0 ? manualOrderCards : matches, versionsCacheRef)}
-          onClose={() => setIsPresentationMode(false)}
+          isSongbaseMode={isSongbasePresenting}
+          packetDetails={isSongbasePresenting ? songbaseSongs : toSelections(manualOrderCards.length > 0 ? manualOrderCards : matches, versionsCacheRef)}
+          onClose={() => {
+            setIsPresentationMode(false);
+            setIsSongbasePresenting(false);
+          }}
         />
       )}
 

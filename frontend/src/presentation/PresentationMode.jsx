@@ -12,7 +12,7 @@ const PRESET_THEMES = {
   sepia: { bg: '#f4ebd9', text: '#4a3b32', chord: '#b35c00' },
 };
 
-export default function PresentationMode({ packetDetails, isLoading, onClose }) {
+export default function PresentationMode({ packetDetails, isSongbaseMode = false, isLoading, onClose }) {
   // Cache packet details for reloads
   const [cachedDetails, setCachedDetails] = useState(() => {
     try {
@@ -42,7 +42,7 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
     }
   }, [packetDetails]);
 
-  const activeDetails = (packetDetails && packetDetails.length > 0) ? packetDetails : (cachedDetails || []);
+  const activeDetails = (packetDetails && (packetDetails.length > 0 || isSongbaseMode)) ? packetDetails : (cachedDetails || []);
 
   const [activeSong, setActiveSong] = useState(() => {
     try {
@@ -99,6 +99,13 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [activeDetails]);
+
+  // Direct Songbase Mode should always start on PresentationHome index
+  useEffect(() => {
+    if (isSongbaseMode) {
+      setActiveSong(null);
+    }
+  }, [isSongbaseMode]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDraggingTextSize, setIsDraggingTextSize] = useState(false);
@@ -257,6 +264,7 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
         <PresentationHome 
           songs={activeDetails} 
           showHeaders={showHeaders}
+          isSongbaseMode={isSongbaseMode}
           theme={customColors}
           onSelectSong={handleSelectSong} 
           onClose={onClose}
