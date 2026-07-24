@@ -1,62 +1,32 @@
-# Backend Documentation
+# Backend Architecture & Storage Guide
 
 ## Overview
 
-Backend is Django + DRF with a `songs` app handling:
+Song Packeter is **100% client-side**. The legacy Django backend and PostgreSQL database were completely replaced with browser-native processing (IndexedDB + `pdf-lib` + `fuzzysort`) and Vercel KV serverless cloud storage.
 
-- Songbase sync/import
-- Matching/search
-- Song version retrieval
-- Packet preview and final PDF generation
-- Optimized order computation
+No local servers, Docker containers, or Python runtimes are required to run or develop Song Packeter.
 
-## Key Modules
+---
 
-- `backend/songs/models.py`
-  - `Song`: canonical song entry + metadata + raw source + parsed metadata AST.
-  - `SongVersion`: tune/version rows with default capo + chordpro text.
+## Storage Layers
 
-- `backend/songs/imports.py`
-  - Sync logic for pulling English Songbase data into Postgres.
+### 1. Browser Local Storage (IndexedDB via `idb`)
+All primary offline application data is stored locally in the user's browser using IndexedDB:
 
-- `backend/songs/services.py`
-  - Query splitting and fuzzy candidate lookup.
+- **`songs` store**: English song catalog cached directly from the Songbase API.
+- **`packets` store**: Active user song packets, selections, matching state, and custom ChordPro overrides.
+- **`packet_versions` & `packet_history`**: Complete versioning snapshot history for every packet.
 
-- `backend/songs/views.py`
-  - DRF endpoints for matching, sync, source sample, versions, preview, optimize-order, generate.
+### 2. Vercel KV (Upstash Redis HTTP REST API)
+Shared online packets are hosted using Vercel KV without requiring a custom backend server:
 
-- `backend/songs/pdf.py`
-  - ChordPro-to-render conversion, wrapping, layout simulation, order optimization, and PDF rendering.
+- **Direct Browser REST API**: React app communicates directly with Vercel KV via `fetch()`.
+- **Lossless LZ-String Compression**: Packets are compressed with `lz-string` before saving (`LZString.compressToEncodedURIComponent`).
+- **18-Month Auto-Expiration**: Saved packets use native Redis TTL (`EX 47304000`). If a packet is not accessed for 18 full months, Redis automatically deletes it.
+- **Expiration Renewal on Access**: Opening a packet URL (`/#/p/:slug`) automatically fetches the packet and fires a background `EXPIRE packet:<slug> 47304000` request, renewing the 18-month timer from the date of the visit.
 
-- `backend/songs/serializers.py`
-  - Request/response validation for match and packet selection payloads.
+---
 
-## Data Model Summary
+## Songbase Proxy
 
-`Song`
-- `source_id`, `title`, `key`, `language`
-- `lyrics_plain`, `lyrics_chordpro`, `raw_lyrics_source`, `parsed_lyrics_ast`
-- `raw_html`, timestamps
-
-`SongVersion`
-- FK to `Song`
-- `tune_name`, `capo_default`, `lyrics_chordpro`, `raw_html`
-
-## Runtime Behavior
-
-- All heavy processing is backend-side (matching, parsing, optimize, PDF drawing).
-- Frontend receives lightweight JSON + PDF blobs.
-- Generate endpoint returns stats in response headers:
-  - `X-Packet-Pages`
-  - `X-Packet-Song-Spills`
-
-## Local Backend (without Docker)
-
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver 0.0.0.0:8000
-```
+Songbase catalog sync requests are proxied seamlessly via Vercel Edge proxies (`vercel.json` rewrites) to bypass browser CORS restrictions while maintaining zero backend infrastructure.

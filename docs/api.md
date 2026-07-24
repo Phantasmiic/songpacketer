@@ -1,116 +1,55 @@
-# API Documentation
+# API & Client Methods Documentation
 
-Base URL (dev): `http://localhost:8000/api`
+## Overview
 
-## API Root
+All API operations in Song Packeter are client-side JavaScript functions exported by `src/api/client.js`. The app operates offline using IndexedDB, with optional Vercel KV (Upstash Redis) HTTP endpoints for online packet sharing.
 
-- `GET /api`
-- Returns route URLs + docs metadata.
+---
 
-## Match Songs
+## 1. Local Database & Matching Methods (`src/api/client.js`)
 
-- `POST /api/songs/match`
-- Request:
+### `matchSongs(inputText, queries)`
+- Runs client-side fuzzy search (`fuzzysort`) against the local IndexedDB `songs` store.
+- Parses input line by line and returns ranked song candidates.
 
-```json
-{
-  "input_text": "Lord Jesus you are Lovel\nBe thou my vision"
-}
-```
+### `fetchVersions(songId)`
+- Retrieves tune versions and default capos for a given song ID from IndexedDB.
 
-- Response (shape):
+### `syncSongbase()`
+- Syncs the English song catalog from Songbase directly into IndexedDB.
 
-```json
-{
-  "results": [
-    {
-      "input": "Lord Jesus you are Lovel",
-      "selected": {
-        "song_id": 123,
-        "title": "Lord Jesus You're Lovely",
-        "key": "C",
-        "score": 0.82
-      },
-      "candidates": [
-        {"song_id": 123, "title": "...", "key": "C", "score": 0.82}
-      ]
-    }
-  ]
-}
-```
+### `generatePacketPdf(selections, maintainOriginalOrder, showSectionHeadersInBody, showSectionHeadersInIndex)`
+- Typesets the setlist and returns a PDF byte array via `pdf-lib`.
 
-Notes:
-- Candidate list currently returns up to 10.
-- `selected` is only set when top score is at least `0.5`.
+### `optimizePacketOrder(selections, maintainOriginalOrder)`
+- Runs the simulated annealing layout optimizer to minimize song page splits.
 
-## Song Versions
+---
 
-- `GET /api/songs/{song_id}/versions`
-- Returns tune/version rows including `id`, `tune_name`, `capo_default`, `lyrics_chordpro`.
+## 2. Vercel KV Online Storage Methods (`src/api/client.js`)
 
-## Sync Songbase English
+### `checkSlugAvailability(slug)`
+- Queries Vercel KV via `GET /exists/packet:<slug>`.
+- Returns `{ available: boolean, error: string|null }`.
 
-- `POST /api/songs/sync`
-- Pulls from Songbase endpoint and upserts local DB.
+### `savePacketOnline(slug, packetData)`
+- Compresses packet JSON using lossless `LZString.compressToEncodedURIComponent()`.
+- Uploads to Vercel KV via `GET /set/packet:<slug>/<compressed>/ex/47304000` (547.5-day / 18-month expiration).
+- Returns `{ slug: string, shareUrl: string }`.
 
-## Source Sample (Debug)
+### `fetchPacketOnline(slug)`
+- Downloads packet payload from Vercel KV via `GET /get/packet:<slug>`.
+- Decompresses data losslessly via `LZString.decompressFromEncodedURIComponent()`.
+- Sends background renewal request `GET /expire/packet:<slug>/47304000` to reset the 18-month timer upon UI view.
+- Returns restored JSON packet object.
 
-- `GET /api/songs/source-sample`
-  - Returns raw sample payload from Songbase source.
-- `GET /api/songs/source-sample/inspect`
-  - Human-readable inspect page with expandable/scrollable lyrics body.
+---
 
-## Packet Preview
+## 3. Vercel KV REST Endpoints Summary
 
-- `POST /api/packet/preview`
-- Request:
-
-```json
-{
-  "selections": [
-    {
-      "song_id": 123,
-      "version_id": 456,
-      "capo": 2,
-      "chordpro_override": "",
-      "title_override": "",
-      "force_new_page": false
-    }
-  ],
-  "maintain_original_order": false
-}
-```
-
-- Returns estimated layout/placement JSON (non-PDF).
-
-## Optimize Order
-
-- `POST /api/packet/optimize-order`
-- Same request shape as preview/generate.
-- Returns order index array:
-
-```json
-{
-  "order": [5, 0, 1, 2, 4, 3],
-  "maintain_original_order": false,
-  "count": 6
-}
-```
-
-## Generate PDF
-
-- `POST /api/packet/generate`
-- Same request shape as preview/optimize.
-- Returns `application/pdf` blob.
-- Response headers include:
-  - `X-Packet-Pages`
-  - `X-Packet-Song-Spills`
-
-## Validation Rules (Selections)
-
-- `song_id`: required
-- `version_id`: optional, nullable
-- `capo`: optional, `0..12`
-- `chordpro_override`: optional
-- `title_override`: optional
-- `force_new_page`: optional boolean
+| Endpoint | Method | Purpose |
+| :--- | :--- | :--- |
+| `/exists/packet:<slug>` | `GET` | Check if URL slug is already taken in Redis |
+| `/set/packet:<slug>/<data>/ex/47304000` | `GET` | Save packet with 18-month auto-expiration |
+| `/get/packet:<slug>` | `GET` | Download packet payload |
+| `/expire/packet:<slug>/47304000` | `GET` | Reset 18-month expiration timer upon UI visit |

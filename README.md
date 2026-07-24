@@ -30,11 +30,19 @@ Visit: `http://localhost:5173`
 
 *(Note: On your first visit, click "Sync Library" in the top bar to pull down the Songbase catalog into your browser cache)*
 
+## Documentation
+
+Comprehensive project documentation and developer reference guides are located in the [`docs/`](docs/README.md) directory:
+
+- **[Architecture & Developer Guide for AI Agents](docs/ARCHITECTURE_FOR_AGENTS.md)**: Deep technical overview of the system architecture, state machines, PDF engine, presentation multi-column layout auto-sizer, Vercel KV online storage, and AI coding guidelines.
+- **[Documentation Hub](docs/README.md)**: Index of all documentation guides (Frontend, API, Optimization, UI Workflow).
+
 ## Tests
 
-The custom PDF typesetting algorithms (chord alignment, word wrapping, layout boundaries, and the layout optimizer) have been fully TDD'd in JavaScript.
+The custom PDF typesetting algorithms (chord alignment, word wrapping, layout boundaries, presentation auto-sizing, and layout optimizer) are fully tested in JavaScript.
 
 ```bash
 cd frontend
 npm run test
 ```
+

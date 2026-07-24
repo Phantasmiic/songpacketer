@@ -22,6 +22,10 @@ import {
   IconButton,
   Stack,
   Tooltip,
+  Checkbox,
+  FormControlLabel,
+  FormHelperText,
+  InputAdornment,
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -29,6 +33,9 @@ import SyncIcon from '@mui/icons-material/Sync';
 import InfoIcon from '@mui/icons-material/Info';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SaveIcon from '@mui/icons-material/Save';
+import ShareIcon from '@mui/icons-material/Share';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
 
 import PresentationMode from './presentation/PresentationMode';
 import InputStep from './components/InputStep';
@@ -54,6 +61,11 @@ import {
   importSongPacket,
   updateSongPacketTitle,
   deleteSongPacket,
+  slugify,
+  checkSlugAvailability,
+  savePacketOnline,
+  fetchPacketOnline,
+  isKvConfigured,
 } from './api/client';
 
 const steps = ['Input', 'Refine', 'Layout'];
@@ -176,14 +188,74 @@ function App() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveDescription, setSaveDescription] = useState('');
   const [packetMenuAnchor, setPacketMenuAnchor] = useState(null);
+  const [saveOnlineEnabled, setSaveOnlineEnabled] = useState(false);
+  const [customSlug, setCustomSlug] = useState('');
+  const [slugStatus, setSlugStatus] = useState({ checking: false, available: null, error: '' });
   const [hasUnsavedEditorChanges, setHasUnsavedEditorChanges] = useState(false);
   const [previewPdfUrl, setPreviewPdfUrl] = useState(null);
   const { width: sidebarWidth, isResizing: sidebarResizing, startResize } = useResizableSidebar({ initialWidth: 500, minWidth: 350, maxWidth: 1000 });
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [isPresentationMode, setIsPresentationMode] = useState(() => {
-    if (window.location.pathname.startsWith('/present')) return true;
-    return localStorage.getItem('presentationActive') === 'true';
+    return typeof window !== 'undefined' && window.location.pathname.startsWith('/present');
   });
+
+  // Automatically format custom slug when popover opens or packet title changes
+  useEffect(() => {
+    if (packetMenuAnchor) {
+      setCustomSlug(slugify(packetTitle || 'worship-packet'));
+    }
+  }, [packetMenuAnchor]);
+
+  // Debounced availability check for custom URL slug
+  useEffect(() => {
+    if (!saveOnlineEnabled || !customSlug || customSlug.trim().length < 3) {
+      setSlugStatus({ checking: false, available: false, error: customSlug ? 'Slug must be at least 3 characters' : '' });
+      return;
+    }
+
+    setSlugStatus({ checking: true, available: null, error: '' });
+    const timer = setTimeout(async () => {
+      const res = await checkSlugAvailability(customSlug);
+      setSlugStatus({ checking: false, available: res.available, error: res.error || '' });
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [saveOnlineEnabled, customSlug]);
+
+  // Load online packet if URL contains #/p/:slug or ?packet=:slug
+  useEffect(() => {
+    async function checkOnlineRoute() {
+      const hash = window.location.hash;
+      let slug = null;
+      if (hash && hash.startsWith('#/p/')) {
+        slug = hash.replace('#/p/', '').split('?')[0];
+      } else {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('packet')) {
+          slug = params.get('packet');
+        }
+      }
+      if (!slug) return;
+
+      try {
+        setLoading(true);
+        const packetData = await fetchPacketOnline(slug);
+        if (packetData) {
+          await importSongPacket(packetData);
+          await loadPacketList();
+          setToast(`Loaded online packet: "${packetData.title || slug}"`);
+        }
+      } catch (err) {
+        console.error('Failed to load online packet:', err);
+        setError(err.message || 'Failed to load online packet');
+      } finally {
+        setLoading(false);
+      }
+    }
+    checkOnlineRoute();
+    window.addEventListener('hashchange', checkOnlineRoute);
+    return () => window.removeEventListener('hashchange', checkOnlineRoute);
+  }, []);
 
   useEffect(() => {
     // Save to local storage
@@ -1476,140 +1548,143 @@ function App() {
         {/* Spacer to push sync status and packet settings to the right */}
         <Box sx={{ flexGrow: 1 }} />
 
-        {/* Constant sync status display */}
-        {/* Constant sync status display */}
-        <Tooltip
-          title={
-            <Box sx={{ p: 1, maxWidth: 280 }}>
-              <Typography variant="caption" display="block" sx={{ fontWeight: 700, color: 'text.primary', mb: 0.5 }}>
-                Songbase Library Sync
-              </Typography>
-              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1, lineHeight: 1.3 }}>
-                Songs available from Songbase for use in packets.
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 0.75, borderTop: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.secondary' }}>
-                  {syncing ? 'Syncing...' : `Last synced: ${formatLastSynced(lastSynced)}`}
-                </Typography>
-                <IconButton
-                  size="small"
-                  onClick={handleSync}
-                  disabled={syncing || loading}
-                  title="Resync songs from Songbase"
-                  sx={{
-                    p: 0.25,
-                    color: 'primary.main',
-                    '&:hover': { color: 'primary.dark' },
-                    animation: syncing ? 'spin 2s linear infinite' : 'none',
-                    '@keyframes spin': {
-                      '0%': { transform: 'rotate(0deg)' },
-                      '100%': { transform: 'rotate(360deg)' },
-                    },
-                  }}
-                >
-                  <SyncIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Box>
-            </Box>
-          }
-          disableInteractive={false}
-          placement="bottom"
-          arrow
-          enterDelay={100}
-          leaveDelay={300}
-          slotProps={{
-            tooltip: {
-              sx: {
-                bgcolor: 'background.paper',
-                color: 'text.primary',
-                boxShadow: 3,
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 2,
-                p: 0.75,
-              },
-            },
-            arrow: {
-              sx: {
-                color: 'background.paper',
-                '&::before': {
-                  border: '1px solid',
-                  borderColor: 'divider',
+        {/* Right Action Controls Container with Consistent Spacing */}
+        <Box sx={{ flexShrink: 0, display: 'flex', gap: 1.5, alignItems: 'center' }}>
+          {/* Sync status display - only shown on homepage / Input step (step === 0) */}
+          {step === 0 ? (
+            <Tooltip
+              title={
+                <Box sx={{ p: 1, maxWidth: 280 }}>
+                  <Typography variant="caption" display="block" sx={{ fontWeight: 700, color: 'text.primary', mb: 0.5 }}>
+                    Songbase Library Sync
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1, lineHeight: 1.3 }}>
+                    Songs available from Songbase for use in packets.
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 0.75, borderTop: '1px solid', borderColor: 'divider' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+                      {syncing ? 'Syncing...' : `Last synced: ${formatLastSynced(lastSynced)}`}
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      onClick={handleSync}
+                      disabled={syncing || loading}
+                      title="Resync songs from Songbase"
+                      sx={{
+                        p: 0.25,
+                        color: 'primary.main',
+                        '&:hover': { color: 'primary.dark' },
+                        animation: syncing ? 'spin 2s linear infinite' : 'none',
+                        '@keyframes spin': {
+                          '0%': { transform: 'rotate(0deg)' },
+                          '100%': { transform: 'rotate(360deg)' },
+                        },
+                      }}
+                    >
+                      <SyncIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Box>
+                </Box>
+              }
+              disableInteractive={false}
+              placement="bottom"
+              arrow
+              enterDelay={100}
+              leaveDelay={300}
+              slotProps={{
+                tooltip: {
+                  sx: {
+                    bgcolor: 'background.paper',
+                    color: 'text.primary',
+                    boxShadow: 3,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    p: 0.75,
+                  },
                 },
-              },
-            },
-          }}
-        >
-          <Box
-            sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 1,
-              bgcolor: 'action.selected',
-              px: 1.5,
-              py: 0.5,
-              borderRadius: 16,
-              border: '1px solid',
-              borderColor: 'divider',
-              cursor: 'pointer',
-              userSelect: 'none',
-              mr: activePacket ? 1.5 : 0,
-              transition: 'background-color 0.2s',
-              '&:hover': {
-                bgcolor: 'action.hover',
-              },
-            }}
-          >
-            <Box
-              sx={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                bgcolor: syncing ? 'warning.main' : syncedCount > 0 ? 'success.main' : 'error.main',
-                animation: syncing ? 'pulse 1.5s infinite' : 'none',
-                '@keyframes pulse': {
-                  '0%': { transform: 'scale(0.95)', opacity: 0.7 },
-                  '70%': { transform: 'scale(1)', opacity: 1 },
-                  '100%': { transform: 'scale(0.95)', opacity: 0.7 },
+                arrow: {
+                  sx: {
+                    color: 'background.paper',
+                    '&::before': {
+                      border: '1px solid',
+                      borderColor: 'divider',
+                    },
+                  },
                 },
               }}
-            />
-            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>
-              {syncing ? 'Syncing...' : `${syncedCount.toLocaleString()} songs synced`}
-            </Typography>
-            <InfoIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-          </Box>
-        </Tooltip>
-
-        {/* Right: Manage Packet & Save Icon */}
-        {activePacket ? (
-          <Box sx={{ flexShrink: 0, display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Button
-              variant="contained"
-              color="secondary"
-              size="small"
-              startIcon={<PlayArrowIcon />}
-              onClick={() => setIsPresentationMode(true)}
-              sx={{ textTransform: 'none', fontWeight: 600 }}
             >
-              Present
-            </Button>
-            <Tooltip title="Save & Export Packet">
-              <IconButton
-                color="primary"
-                onClick={(event) => setPacketMenuAnchor(event.currentTarget)}
+              <Box
                 sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 1,
                   bgcolor: 'action.selected',
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 16,
                   border: '1px solid',
                   borderColor: 'divider',
-                  '&:hover': { bgcolor: 'action.hover' }
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  transition: 'background-color 0.2s',
+                  '&:hover': {
+                    bgcolor: 'action.hover',
+                  },
                 }}
               >
-                <SaveIcon />
-              </IconButton>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: syncing ? 'warning.main' : syncedCount > 0 ? 'success.main' : 'error.main',
+                    animation: syncing ? 'pulse 1.5s infinite' : 'none',
+                    '@keyframes pulse': {
+                      '0%': { transform: 'scale(0.95)', opacity: 0.7 },
+                      '70%': { transform: 'scale(1)', opacity: 1 },
+                      '100%': { transform: 'scale(0.95)', opacity: 0.7 },
+                    },
+                  }}
+                />
+                <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                  {syncing ? 'Syncing...' : `${syncedCount.toLocaleString()} songs synced`}
+                </Typography>
+                <InfoIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+              </Box>
             </Tooltip>
-          </Box>
-        ) : null}
+          ) : null}
+
+          {/* Manage Packet & Save Icon */}
+          {activePacket ? (
+            <>
+              <Button
+                variant="contained"
+                color="secondary"
+                size="small"
+                startIcon={<PlayArrowIcon />}
+                onClick={() => setIsPresentationMode(true)}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Present
+              </Button>
+              <Tooltip title="Save & Export Packet">
+                <IconButton
+                  color="primary"
+                  onClick={(event) => setPacketMenuAnchor(event.currentTarget)}
+                  sx={{
+                    bgcolor: 'action.selected',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}
+                >
+                  <SaveIcon />
+                </IconButton>
+              </Tooltip>
+            </>
+          ) : null}
+        </Box>
       </Paper>
 
       <Popover
@@ -1625,7 +1700,7 @@ function App() {
           horizontal: 'right',
         }}
         PaperProps={{
-          sx: { width: 320, p: 2.5, borderRadius: 2, boxShadow: 3 }
+          sx: { width: 360, p: 2.5, borderRadius: 2, boxShadow: 3 }
         }}
       >
         <Stack spacing={2}>
@@ -1644,19 +1719,90 @@ function App() {
             fullWidth
           />
 
+          <Divider sx={{ my: 0.5 }} />
+
+          <FormControlLabel
+            control={
+              <Checkbox 
+                checked={saveOnlineEnabled} 
+                onChange={(e) => setSaveOnlineEnabled(e.target.checked)} 
+                color="primary" 
+                size="small"
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Save online with shareable URL
+              </Typography>
+            }
+          />
+
+          {saveOnlineEnabled && (
+            <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+              <TextField
+                label="Custom URL Slug"
+                size="small"
+                value={customSlug}
+                onChange={(e) => setCustomSlug(slugify(e.target.value))}
+                fullWidth
+                placeholder="sunday-worship"
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">/p/</InputAdornment>,
+                }}
+                sx={{ mb: 1 }}
+              />
+              {slugStatus.checking ? (
+                <Typography variant="caption" sx={{ color: 'warning.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  Checking availability...
+                </Typography>
+              ) : slugStatus.available ? (
+                <Typography variant="caption" sx={{ color: 'success.main', display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}>
+                  <CheckCircleIcon fontSize="inherit" /> URL is available!
+                </Typography>
+              ) : (
+                <Typography variant="caption" sx={{ color: 'error.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <ErrorIcon fontSize="inherit" /> {slugStatus.error || 'Invalid URL'}
+                </Typography>
+              )}
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, fontSize: '0.75rem', lineHeight: 1.3 }}>
+                Automatically deleted if not accessed for 18 months. Opening the packet URL resets the 18-month timer.
+              </Typography>
+            </Box>
+          )}
+
           <Button
             variant="contained"
             size="medium"
-            startIcon={<DownloadIcon />}
-            onClick={() => {
-              handleExportPacket();
-              setPacketMenuAnchor(null);
+            startIcon={saveOnlineEnabled ? <ShareIcon /> : <DownloadIcon />}
+            onClick={async () => {
+              if (saveOnlineEnabled && activePacket) {
+                if (!slugStatus.available) return;
+                try {
+                  setLoading(true);
+                  const exportData = await exportSongPacket(activePacket.id);
+                  const { shareUrl } = await savePacketOnline(customSlug, exportData);
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(shareUrl);
+                    setToast(`Saved online! Share link copied: ${shareUrl}`);
+                  } else {
+                    setToast(`Saved online! Share link: ${shareUrl}`);
+                  }
+                  setPacketMenuAnchor(null);
+                } catch (err) {
+                  setError(err.message || 'Failed to save online packet');
+                } finally {
+                  setLoading(false);
+                }
+              } else {
+                handleExportPacket();
+                setPacketMenuAnchor(null);
+              }
             }}
-            disabled={loading}
+            disabled={loading || (saveOnlineEnabled && (!customSlug || slugStatus.checking || !slugStatus.available))}
             fullWidth
             sx={{ textTransform: 'none', fontWeight: 600 }}
           >
-            Export JSON File
+            {saveOnlineEnabled ? 'Save Online & Copy Link' : 'Export JSON File'}
           </Button>
         </Stack>
       </Popover>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, RadioGroup, FormControlLabel, Radio, Typography, Switch, TextField, Divider, Slider, CircularProgress } from '@mui/material';
+import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, FormControl, InputLabel, Select, MenuItem, FormControlLabel, Typography, Switch, TextField, Divider, Slider, CircularProgress } from '@mui/material';
+import BugReportIcon from '@mui/icons-material/BugReport';
+import CheckIcon from '@mui/icons-material/Check';
 import PresentationHome from './PresentationHome';
 import PresentationSlide from './PresentationSlide';
 import { parseChordProBlocks } from './chordproParser';
@@ -20,6 +22,18 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
       return [];
     }
   });
+  
+  const [debugHandler, setDebugHandler] = useState(null);
+  const [debugCopied, setDebugCopied] = useState(false);
+
+  const handleOpenSettings = (handlerFn) => {
+    if (typeof handlerFn === 'function') {
+      setDebugHandler(() => handlerFn);
+    } else {
+      setDebugHandler(null);
+    }
+    setSettingsOpen(true);
+  };
   
   useEffect(() => {
     if (packetDetails && packetDetails.length > 0) {
@@ -43,31 +57,34 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
       }
 
       // 2. Fallback to localStorage active song
-      const cachedSong = localStorage.getItem('presentationActiveSong');
-      return (cachedSong && cachedSong !== 'undefined' && cachedSong !== 'null') ? JSON.parse(cachedSong) : null;
+      const id = localStorage.getItem('presentationActiveSongId');
+      if (id && activeDetails.length > 0) {
+        const found = activeDetails.find(s => String(s.song_id) === id);
+        if (found) return found;
+      }
     } catch (e) {
-      return null;
+      // fallback
     }
+    return null;
   });
 
-  // Sync state to URL and localStorage
+  // Sync URL when activeSong changes
   useEffect(() => {
-    const path = window.location.pathname;
-    if (activeSong) {
-      localStorage.setItem('presentationActiveSong', JSON.stringify(activeSong));
-      const targetPath = `/present/${activeSong.song_id}`;
-      if (path !== targetPath) {
-        window.history.pushState({}, '', targetPath);
+    if (activeSong && activeSong.song_id) {
+      const newPath = `/present/${activeSong.song_id}`;
+      if (window.location.pathname !== newPath) {
+        window.history.pushState({}, '', newPath);
       }
+      localStorage.setItem('presentationActiveSongId', String(activeSong.song_id));
     } else {
-      localStorage.removeItem('presentationActiveSong');
-      if (path !== '/present') {
+      if (window.location.pathname.startsWith('/present/')) {
         window.history.pushState({}, '', '/present');
       }
+      localStorage.removeItem('presentationActiveSongId');
     }
   }, [activeSong]);
 
-  // Handle Browser Back/Forward within Presentation Mode
+  // Handle Browser Back/Forward navigation inside Presentation Mode
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
@@ -145,9 +162,6 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
 
   const handleGoHome = () => {
     setActiveSong(null);
-    localStorage.removeItem('presentationActiveSong');
-    localStorage.removeItem('presentationSlideIndex');
-    localStorage.removeItem('presentationSlideSongId');
   };
 
   const handleAutoSize = () => { console.log("handleAutoSize RUNNING");
@@ -222,11 +236,22 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
   }, [activeSong?.song_id, showChords, fullSongMode]);
 
   return (
-    <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1200, bgcolor: customColors.bg }}>
-      {isLoading ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: customColors.text }}>
-          <CircularProgress size={60} thickness={4} sx={{ color: customColors.chord, mb: 4 }} />
-          <Typography variant="h5" sx={{ fontWeight: 500 }}>Loading Songs...</Typography>
+    <Box 
+      sx={{ 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        width: '100vw', 
+        height: '100vh', 
+        zIndex: 9999, 
+        bgcolor: customColors.bg,
+        color: customColors.text,
+        overflow: 'hidden'
+      }}
+    >
+      {isLoading && activeDetails.length === 0 ? (
+        <Box sx={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+          <CircularProgress color="inherit" />
         </Box>
       ) : !activeSong ? (
         <PresentationHome 
@@ -235,7 +260,7 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
           theme={customColors}
           onSelectSong={handleSelectSong} 
           onClose={onClose}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSettings={handleOpenSettings}
         />
       ) : (
         <PresentationSlide 
@@ -259,7 +284,7 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
           setFullSongManualFontPx={setFullSongManualFontPx}
           isFullSongAuto={isFullSongAuto}
           setIsFullSongAuto={setIsFullSongAuto}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSettings={handleOpenSettings}
         />
       )}
 
@@ -290,12 +315,21 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
           {/* Theme Section */}
           <Box sx={{ opacity: isDraggingTextSize ? 0.1 : 1, transition: 'opacity 0.2s' }}>
             <Typography variant="subtitle1" sx={{ mt: 1, mb: 1, fontWeight: 'bold' }}>Color Theme</Typography>
-            <RadioGroup value={themeMode} onChange={(e) => handlePresetChange(e.target.value)}>
-              <FormControlLabel value="dark" control={<Radio />} label="Dark (Black / White / Blue)" />
-              <FormControlLabel value="light" control={<Radio />} label="Light (White / Black / Dark Blue)" />
-              <FormControlLabel value="sepia" control={<Radio />} label="Sepia (Cream / Dark Brown / Rust)" />
-              <FormControlLabel value="custom" control={<Radio />} label="Custom Colors" />
-            </RadioGroup>
+            <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
+              <InputLabel id="theme-select-label">Select Theme</InputLabel>
+              <Select
+                labelId="theme-select-label"
+                id="theme-select"
+                value={themeMode}
+                label="Select Theme"
+                onChange={(e) => handlePresetChange(e.target.value)}
+              >
+                <MenuItem value="dark">Dark (Black / White / Blue)</MenuItem>
+                <MenuItem value="light">Light (White / Black / Dark Blue)</MenuItem>
+                <MenuItem value="sepia">Sepia (Cream / Dark Brown / Rust)</MenuItem>
+                <MenuItem value="custom">Custom Colors</MenuItem>
+              </Select>
+            </FormControl>
 
             {/* Custom Colors - Only show if custom mode selected */}
             {themeMode === 'custom' && (
@@ -396,9 +430,9 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
                   >
                     Auto
                   </Button>
-                  <Typography variant="body2" sx={{ fontWeight: 700, minWidth: '70px', textAlign: 'right' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, minWidth: '45px', textAlign: 'right' }}>
                     {isSlideAuto 
-                      ? `${Math.round(slideAutoFontPx || 38)}px (Auto)` 
+                      ? `${Math.round(slideAutoFontPx || 38)}px` 
                       : `${Math.round(slideManualFontPx || slideAutoFontPx || 38)}px`}
                   </Typography>
                 </Box>
@@ -452,9 +486,9 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
                   >
                     Auto
                   </Button>
-                  <Typography variant="body2" sx={{ fontWeight: 700, minWidth: '70px', textAlign: 'right' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, minWidth: '45px', textAlign: 'right' }}>
                     {isFullSongAuto 
-                      ? `${Math.round(fullSongFontPx || 32)}px (Auto)` 
+                      ? `${Math.round(fullSongFontPx || 32)}px` 
                       : `${Math.round(fullSongManualFontPx || fullSongFontPx || 32)}px`}
                   </Typography>
                 </Box>
@@ -507,6 +541,26 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
                   label="Show Section Headers in Song List"
                 />
               </>
+            )}
+
+            {/* Debug Copy Info button inside Settings dialog */}
+            {debugHandler && (
+              <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color={debugCopied ? 'success' : 'inherit'}
+                  startIcon={debugCopied ? <CheckIcon /> : <BugReportIcon />}
+                  onClick={() => {
+                    debugHandler();
+                    setDebugCopied(true);
+                    setTimeout(() => setDebugCopied(false), 2000);
+                  }}
+                  sx={{ textTransform: 'none', fontSize: '0.8125rem' }}
+                >
+                  {debugCopied ? 'Copied Debug JSON!' : 'Copy Debug Info'}
+                </Button>
+              </Box>
             )}
           </Box>
         </DialogContent>

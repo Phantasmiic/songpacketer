@@ -219,15 +219,19 @@ export default function PresentationSlide({
 
   // Ref for the full-song container, used for DOM-based auto-sizing
   const fullSongRef = useRef(null);
-  const [fullSongFontPx, setFullSongFontPx] = useState(16);
+  const [internalFullSongFontPx, setInternalFullSongFontPx] = useState(parentFullSongFontPx || 32);
   const [fullSongColumns, setFullSongColumns] = useState('auto');
 
   const updateFullSongFontPx = useCallback((size) => {
-    setFullSongFontPx(size);
+    setInternalFullSongFontPx(size);
     if (typeof setParentFullSongFontPx === 'function') {
       setParentFullSongFontPx(size);
     }
   }, [setParentFullSongFontPx]);
+
+  const displayFontPx = isFullSongAuto
+    ? internalFullSongFontPx
+    : (fullSongManualFontPx || internalFullSongFontPx || 32);
 
 
   const hasChorus = useMemo(() => rawBlocks.some(b => b.type === 'chorus'), [rawBlocks]);
@@ -379,7 +383,7 @@ export default function PresentationSlide({
         };
 
         let lo = 6;
-        let hi = 90;
+        let hi = 54; // Cap full-song text size at 54px for optimal multi-column distribution
         let bestForC = lo;
 
         while (hi - lo > 0.5) {
@@ -470,7 +474,15 @@ export default function PresentationSlide({
       el.style.overflow = 'hidden';
     };
 
+    let animFrame = null;
     let resizeObserver = null;
+
+    if (typeof window !== 'undefined') {
+      animFrame = requestAnimationFrame(() => {
+        measureLayout();
+      });
+    }
+
     if (typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver(measureLayout);
       resizeObserver.observe(el);
@@ -486,6 +498,7 @@ export default function PresentationSlide({
     }
 
     return () => {
+      if (animFrame) cancelAnimationFrame(animFrame);
       if (resizeObserver) resizeObserver.disconnect();
     };
   }, [fullSongMode, presentationSequence, isFullSongAuto, fullSongManualFontPx]);
@@ -772,21 +785,12 @@ export default function PresentationSlide({
           </Tooltip>
 
           {onOpenSettings && (
-            <IconButton onClick={onOpenSettings} title="Settings" aria-label="Settings" sx={{ color: textColor }}>
+            <IconButton onClick={() => onOpenSettings(handleCopyDebugInfo)} title="Settings" aria-label="Settings" sx={{ color: textColor }}>
               <SettingsIcon />
             </IconButton>
           )}
 
           <FullscreenButton textColor={textColor} />
-
-          <Tooltip title={debugCopied ? "Copied debug JSON!" : "Copy Debug Info"} enterDelay={0} arrow>
-            <IconButton 
-              onClick={handleCopyDebugInfo} 
-              sx={{ color: debugCopied ? '#4caf50' : textColor, transition: 'color 0.2s' }}
-            >
-              <BugReportIcon />
-            </IconButton>
-          </Tooltip>
         </Box>
       </Box>
 
@@ -827,9 +831,9 @@ export default function PresentationSlide({
               textAlign: 'left',
               width: '100%',
               fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-              fontSize: `${fullSongFontPx}px`,
+              fontSize: `${displayFontPx}px`,
               columnCount: fullSongColumns,
-              columnGap: '1.2em',
+              columnGap: '1.5em',
               columnFill: 'balance',
               height: 'calc(100vh - 100px)',
               overflow: 'hidden',
