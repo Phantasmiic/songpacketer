@@ -1477,28 +1477,36 @@ function App() {
         {/* Constant sync status display */}
         <Tooltip
           title={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 0.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: 'inherit', userSelect: 'none' }}>
-                {syncing ? 'Syncing...' : `Last synced: ${formatLastSynced(lastSynced)}`}
+            <Box sx={{ p: 1, maxWidth: 280 }}>
+              <Typography variant="caption" display="block" sx={{ fontWeight: 700, color: 'text.primary', mb: 0.5 }}>
+                Songbase Library Sync
               </Typography>
-              <IconButton
-                size="small"
-                onClick={handleSync}
-                disabled={syncing || loading}
-                title="Resync songs from Songbase"
-                sx={{
-                  p: 0.25,
-                  color: 'inherit',
-                  '&:hover': { color: 'primary.light' },
-                  animation: syncing ? 'spin 2s linear infinite' : 'none',
-                  '@keyframes spin': {
-                    '0%': { transform: 'rotate(0deg)' },
-                    '100%': { transform: 'rotate(360deg)' },
-                  },
-                }}
-              >
-                <SyncIcon sx={{ fontSize: 16 }} />
-              </IconButton>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1, lineHeight: 1.3 }}>
+                These are songs synced from Songbase for us to use in packets we create.
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 0.75, borderTop: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+                  {syncing ? 'Syncing...' : `Last synced: ${formatLastSynced(lastSynced)}`}
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={handleSync}
+                  disabled={syncing || loading}
+                  title="Resync songs from Songbase"
+                  sx={{
+                    p: 0.25,
+                    color: 'primary.main',
+                    '&:hover': { color: 'primary.dark' },
+                    animation: syncing ? 'spin 2s linear infinite' : 'none',
+                    '@keyframes spin': {
+                      '0%': { transform: 'rotate(0deg)' },
+                      '100%': { transform: 'rotate(360deg)' },
+                    },
+                  }}
+                >
+                  <SyncIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Box>
             </Box>
           }
           disableInteractive={false}
@@ -1658,58 +1666,69 @@ function App() {
 
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: 'stretch', gap: { xs: 3, lg: 0 } }}>
         <Box sx={{ minWidth: 0, flexGrow: 1, mb: 2 }}>
-        {step === 0 && (
-          <InputStep
-            packetTitle={packetTitle}
-            setPacketTitle={setPacketTitle}
-            inputText={inputText}
-            setInputText={setInputText}
-            existingPackets={existingPackets}
-            onOpenExisting={handleOpenExisting}
-            onCreateAndMatch={handleCreateAndMatch}
-            onImportPacket={handleImportPacket}
-            onDeletePacket={handleDeletePacket}
-            loading={loading}
-          />
-        )}
-        {step === 1 && (
-          <ReviewStep
-            matches={matches}
-            onSelectionChange={handleSelectionChange}
-            onSearchCandidates={handleCandidateSearch}
-            onDeleteRow={handleDeleteRow}
-            onResetChordpro={handleResetChordpro}
-            onUpdateMatches={handleUpdateMatches}
-            activeRowIndex={activeReviewRowIndex}
-            setActiveRowIndex={setActiveReviewRowIndex}
-            unmatchedCount={unmatchedCount}
-            duplicateRemovedCount={duplicateRemovedCount}
-            onGoBack={() => setStep(0)}
-            onGoForward={() => setStep(2)}
-          />
-        )}
-        {step === 2 && (
-          <GenerateStep
-            maintainOriginalOrder={maintainOriginalOrder}
-            setMaintainOriginalOrder={handleMaintainOriginalOrderChange}
-            showSectionHeadersInBody={showSectionHeadersInBody}
-            setShowSectionHeadersInBody={handleShowSectionHeadersInBodyChange}
-            showSectionHeadersInIndex={showSectionHeadersInIndex}
-            setShowSectionHeadersInIndex={handleShowSectionHeadersInIndexChange}
-            error={error}
-            manualOrderCards={manualOrderCards}
-            onMoveManualCard={handleMoveManualCard}
-            onToggleForceNewPage={handleToggleForceNewPage}
-            onRegenerateFromManualOrder={handleRegenerateFromManualOrder}
-            loading={loading}
-            packetStats={packetStats}
-            packetVersions={packetVersions}
-            activePacketVersionNumber={activePacket?.current_version?.version_number || null}
-            onActivateVersion={handleActivatePacketVersion}
-            onGenerateFromVersion={handleGenerateFromVersion}
-            packetHistory={packetHistory}
-            onGoBack={() => setStep(1)}
-          />
+        {loading || isHydrating ? (
+          <Paper elevation={1} sx={{ p: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 350, borderRadius: 3, gap: 3 }}>
+            <CircularProgress size={56} thickness={4} />
+            <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 500 }}>
+              Processing & Loading Packet...
+            </Typography>
+          </Paper>
+        ) : (
+          <>
+            {step === 0 && (
+              <InputStep
+                packetTitle={packetTitle}
+                setPacketTitle={setPacketTitle}
+                inputText={inputText}
+                setInputText={setInputText}
+                existingPackets={existingPackets}
+                onOpenExisting={handleOpenExisting}
+                onCreateAndMatch={handleCreateAndMatch}
+                onImportPacket={handleImportPacket}
+                onDeletePacket={handleDeletePacket}
+                loading={loading}
+              />
+            )}
+            {step === 1 && (
+              <ReviewStep
+                matches={matches}
+                onSelectionChange={handleSelectionChange}
+                onSearchCandidates={handleCandidateSearch}
+                onDeleteRow={handleDeleteRow}
+                onResetChordpro={handleResetChordpro}
+                onUpdateMatches={handleUpdateMatches}
+                activeRowIndex={activeReviewRowIndex}
+                setActiveRowIndex={setActiveReviewRowIndex}
+                unmatchedCount={unmatchedCount}
+                duplicateRemovedCount={duplicateRemovedCount}
+                onGoBack={() => setStep(0)}
+                onGoForward={() => setStep(2)}
+              />
+            )}
+            {step === 2 && (
+              <GenerateStep
+                maintainOriginalOrder={maintainOriginalOrder}
+                setMaintainOriginalOrder={handleMaintainOriginalOrderChange}
+                showSectionHeadersInBody={showSectionHeadersInBody}
+                setShowSectionHeadersInBody={handleShowSectionHeadersInBodyChange}
+                showSectionHeadersInIndex={showSectionHeadersInIndex}
+                setShowSectionHeadersInIndex={handleShowSectionHeadersInIndexChange}
+                error={error}
+                manualOrderCards={manualOrderCards}
+                onMoveManualCard={handleMoveManualCard}
+                onToggleForceNewPage={handleToggleForceNewPage}
+                onRegenerateFromManualOrder={handleRegenerateFromManualOrder}
+                loading={loading}
+                packetStats={packetStats}
+                packetVersions={packetVersions}
+                activePacketVersionNumber={activePacket?.current_version?.version_number || null}
+                onActivateVersion={handleActivatePacketVersion}
+                onGenerateFromVersion={handleGenerateFromVersion}
+                packetHistory={packetHistory}
+                onGoBack={() => setStep(1)}
+              />
+            )}
+          </>
         )}
         </Box>
         {step > 0 && activePacket ? (
