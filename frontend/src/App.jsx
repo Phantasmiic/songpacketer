@@ -1200,6 +1200,7 @@ function App() {
     if (!file) return;
     
     setLoading(true);
+    setIsHydrating(true);
     setError('');
     try {
       const reader = new FileReader();
@@ -1213,6 +1214,7 @@ function App() {
           setPacketMenuAnchor(null);
         } catch (err) {
           setError('Failed to parse or save imported JSON file.');
+          setIsHydrating(false);
         } finally {
           setLoading(false);
         }
@@ -1220,6 +1222,7 @@ function App() {
       reader.readAsText(file);
     } catch (err) {
       setError('Failed to read file.');
+      setIsHydrating(false);
       setLoading(false);
     }
     e.target.value = null;
@@ -1482,7 +1485,7 @@ function App() {
                 Songbase Library Sync
               </Typography>
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1, lineHeight: 1.3 }}>
-                These are songs synced from Songbase for us to use in packets we create.
+                Songs available from Songbase for use in packets.
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 0.75, borderTop: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.secondary' }}>
