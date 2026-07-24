@@ -216,10 +216,10 @@ export default function PresentationMode({ packetDetails, isLoading, onClose }) 
 
   // Automatically compute optimal text size when a song is navigated to (or layout modes change)
   useEffect(() => {
-    if (activeSong) {
+    if (activeSong && !fullSongMode) {
       handleAutoSize();
     }
-  }, [activeSong?.song_id, showChords]);
+  }, [activeSong?.song_id, showChords, fullSongMode]);
 
   return (
     <Box sx={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1200, bgcolor: customColors.bg }}>
