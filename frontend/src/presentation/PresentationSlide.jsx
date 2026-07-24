@@ -308,8 +308,8 @@ export default function PresentationSlide({
 
       if (!containerWidth || !containerHeight) return;
 
-      // Determine maximum candidate columns based on screen width (min 220px per column)
-      const maxCandidateCols = Math.min(5, Math.max(1, Math.floor((containerWidth + 30) / 250)));
+      // Determine maximum candidate columns based on screen width (min 200px per column for lyrics)
+      const maxCandidateCols = Math.min(5, Math.max(1, Math.floor((containerWidth + 40) / 200)));
 
       // If in manual font size mode, run layout search with the fixed target font size
       if (!isFullSongAuto && fullSongManualFontPx) {
@@ -340,7 +340,9 @@ export default function PresentationSlide({
               if (blockEl.getClientRects().length > 1) blockSplits++;
             });
 
-            const score = targetFont - (lineWraps * 2.0) - (blockSplits * 4.0);
+            // In manual font size mode, prefer multi-column utilization when space fits
+            const colBonus = c > 1 ? (c - 1) * 3.0 : 0;
+            const score = targetFont + colBonus - (lineWraps * 2.0) - (blockSplits * 0.5);
             eligibleCandidates.push({ cols: c, fontSize: targetFont, score });
           }
         }
@@ -400,8 +402,8 @@ export default function PresentationSlide({
 
       if (candidates.length === 0) return;
 
-      // 2. Evaluate quality score for font sizes within 15% wiggle room across candidate column counts
-      const minFontThreshold = absoluteMaxFont * 0.85; // 15% wiggle room
+      // 2. Evaluate quality score for font sizes within wiggle room across candidate column counts
+      const minFontThreshold = absoluteMaxFont * 0.80; // 20% wiggle room to allow optimal multi-column packing
 
       const evalCandidates = [];
       candidates.forEach(cand => {
@@ -448,8 +450,9 @@ export default function PresentationSlide({
           }
         });
 
-        // Quality Score: Font Size minus penalties for line wraps (2.5pt) and block splits (6.0pt)
-        const qualityScore = cand.fontSize - (lineWraps * 2.5) - (blockSplits * 6.0);
+        // Quality Score: Font Size + Multi-Column Utilization Bonus minus minor penalties for line wraps (2.0pt) and block splits (1.0pt)
+        const columnBonus = cand.cols > 1 ? (cand.cols - 1) * 3.0 : 0;
+        const qualityScore = cand.fontSize + columnBonus - (lineWraps * 2.0) - (blockSplits * 1.0);
 
         if (qualityScore > bestScore) {
           bestScore = qualityScore;
@@ -467,8 +470,13 @@ export default function PresentationSlide({
       el.style.overflow = 'hidden';
     };
 
-    const resizeObserver = new ResizeObserver(measureLayout);
-    resizeObserver.observe(el);
+    let resizeObserver = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(measureLayout);
+      resizeObserver.observe(el);
+    } else {
+      measureLayout();
+    }
 
     // Re-measure when web fonts finish loading (fixes Cmd+Shift+R hard reload font race condition)
     if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
@@ -477,7 +485,9 @@ export default function PresentationSlide({
       });
     }
 
-    return () => resizeObserver.disconnect();
+    return () => {
+      if (resizeObserver) resizeObserver.disconnect();
+    };
   }, [fullSongMode, presentationSequence, isFullSongAuto, fullSongManualFontPx]);
 
   // Pre-calculate slide metadata for grouping bars

@@ -97,4 +97,15 @@ This is chorus line one`
     const repeatBtn = screen.getByRole('button', { name: /repeat chorus/i });
     expect(repeatBtn).not.toBeDisabled();
   });
+
+  it('renders full song mode box when fullSongMode is true', () => {
+    const song = {
+      song_id: 'test-5',
+      chordpro_override: `1\nVerse 1 line\nChorus\nChorus line\n2\nVerse 2 line`
+    };
+
+    render(<PresentationSlide song={song} {...defaultProps} fullSongMode={true} />);
+    expect(screen.getByTestId('full-song-box')).toBeInTheDocument();
+  });
 });
+
