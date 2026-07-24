@@ -28,6 +28,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import SyncIcon from '@mui/icons-material/Sync';
 import InfoIcon from '@mui/icons-material/Info';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SaveIcon from '@mui/icons-material/Save';
 
 import PresentationMode from './presentation/PresentationMode';
 import InputStep from './components/InputStep';
@@ -1406,44 +1407,64 @@ function App() {
           })}
         </Box>
 
-        {/* Contextual forward action for step 1 */}
-        {step === 1 && (
+        {/* Step navigation buttons */}
+        {step === 0 && activePacket && (
           <Button
             variant="contained"
             size="small"
-            onClick={() => setStep(2)}
+            onClick={() => setStep(1)}
             disabled={loading || !canProceedToGenerate}
-            sx={{ textTransform: 'none' }}
-          >
-            Continue to Layout →
-          </Button>
-        )}
-
-        {/* Contextual action for step 2 */}
-        {step === 2 && (
-          <Button
-            variant="contained"
-            size="small"
-            onClick={handleGeneratePdf}
-            disabled={loading}
-            sx={{ textTransform: 'none' }}
-          >
-            Generate PDF
-          </Button>
-        )}
-
-        {/* Save version — shown when packet loaded */}
-        {activePacket?.id ? (
-          <Button
-            variant="outlined"
-            size="small"
-            disabled={loading}
-            onClick={() => setSaveDialogOpen(true)}
             sx={{ textTransform: 'none', ml: 1 }}
           >
-            Save Version
+            Continue to Refine →
           </Button>
-        ) : null}
+        )}
+
+        {step === 1 && (
+          <Box sx={{ display: 'flex', gap: 1, ml: 1 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setStep(0)}
+              disabled={loading}
+              sx={{ textTransform: 'none' }}
+            >
+              ← Back to Input
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => setStep(2)}
+              disabled={loading || !canProceedToGenerate}
+              sx={{ textTransform: 'none' }}
+            >
+              Continue to Layout →
+            </Button>
+          </Box>
+        )}
+
+        {step === 2 && (
+          <Box sx={{ display: 'flex', gap: 1, ml: 1 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setStep(1)}
+              disabled={loading}
+              sx={{ textTransform: 'none' }}
+            >
+              ← Back to Refine
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={handleGeneratePdf}
+              disabled={loading}
+              sx={{ textTransform: 'none' }}
+            >
+              Generate PDF
+            </Button>
+          </Box>
+        )}
 
         {hasUnsavedEditorChanges ? (
           <Chip size="small" color="warning" label="Unsaved" sx={{ ml: 0.5 }} />
@@ -1549,9 +1570,9 @@ function App() {
           </Box>
         </Tooltip>
 
-        {/* Right: Manage Packet (shows packet name) */}
+        {/* Right: Manage Packet & Save Icon */}
         {activePacket ? (
-          <Box sx={{ flexShrink: 0, display: 'flex', gap: 1 }}>
+          <Box sx={{ flexShrink: 0, display: 'flex', gap: 1, alignItems: 'center' }}>
             <Button
               variant="contained"
               color="secondary"
@@ -1562,16 +1583,20 @@ function App() {
             >
               Present
             </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              size="small"
-              startIcon={<SettingsIcon />}
-              onClick={(event) => setPacketMenuAnchor(event.currentTarget)}
-              sx={{ textTransform: 'none', fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
-              {activePacket.title}
-            </Button>
+            <Tooltip title="Save & Export Packet">
+              <IconButton
+                color="primary"
+                onClick={(event) => setPacketMenuAnchor(event.currentTarget)}
+                sx={{
+                  bgcolor: 'action.selected',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  '&:hover': { bgcolor: 'action.hover' }
+                }}
+              >
+                <SaveIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
         ) : null}
       </Paper>
@@ -1594,7 +1619,7 @@ function App() {
       >
         <Stack spacing={2}>
           <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700 }}>
-            PACKET SETTINGS
+            SAVE & EXPORT PACKET
           </Typography>
 
           <TextField
@@ -1608,146 +1633,20 @@ function App() {
             fullWidth
           />
 
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleExportPacket}
-              disabled={loading}
-              fullWidth
-              sx={{ textTransform: 'none' }}
-            >
-              Export JSON
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => importFileRef.current?.click()}
-              disabled={loading}
-              fullWidth
-              sx={{ textTransform: 'none' }}
-            >
-              Import JSON
-            </Button>
-            <input
-              type="file"
-              ref={importFileRef}
-              style={{ display: 'none' }}
-              onChange={handleImportPacket}
-              accept=".json"
-            />
-          </Stack>
-
           <Button
             variant="contained"
-            size="small"
+            size="medium"
+            startIcon={<DownloadIcon />}
             onClick={() => {
+              handleExportPacket();
               setPacketMenuAnchor(null);
-              setSaveDialogOpen(true);
             }}
             disabled={loading}
             fullWidth
-            sx={{ textTransform: 'none' }}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
           >
-            Save New Version
+            Export JSON File
           </Button>
-
-          <Divider />
-
-          <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700 }}>
-            VERSION CHECKPOINTS ({packetVersions.length})
-          </Typography>
-
-          <Box sx={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1.5 }}>
-            {packetVersions.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ p: 1.5, fontStyle: 'italic', textAlign: 'center' }}>
-                No versions saved yet.
-              </Typography>
-            ) : (
-              packetVersions.map((version) => {
-                const isCurrent = version.id === activePacket?.current_version?.id || 
-                  (activePacket && !activePacket.current_version && version.version_number === activeVersionNumber);
-                return (
-                  <Box
-                    key={version.id}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      px: 1.5,
-                      py: 1,
-                      borderBottom: '1px solid #f0f0f0',
-                      '&:last-child': { borderBottom: 'none' },
-                      bgcolor: isCurrent ? 'rgba(25, 118, 210, 0.04)' : 'transparent',
-                      cursor: 'pointer',
-                      '&:hover': { bgcolor: isCurrent ? 'rgba(25, 118, 210, 0.08)' : '#fcfcfc' },
-                    }}
-                    onClick={() => handleActivatePacketVersion(version.id)}
-                  >
-                    <Stack spacing={0.2} sx={{ minWidth: 0, flexGrow: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: isCurrent ? 700 : 500, color: isCurrent ? 'primary.main' : 'text.primary' }}>
-                        v{version.version_number}
-                      </Typography>
-                      {version.description && (
-                        <Typography variant="caption" color="text.secondary" noWrap>
-                          {version.description}
-                        </Typography>
-                      )}
-                    </Stack>
-                    <IconButton
-                      size="small"
-                      color="primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleGenerateFromVersion(version.id);
-                      }}
-                      sx={{ p: 0.5 }}
-                    >
-                      <DownloadIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                );
-              })
-            )}
-          </Box>
-
-          <Divider />
-
-          <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700 }}>
-            SWITCH WORKSPACE
-          </Typography>
-
-          <TextField
-            select
-            label="Other local packets"
-            size="small"
-            value={activePacket?.id || ''}
-            onChange={async (e) => {
-              setPacketMenuAnchor(null);
-              const nextId = Number(e.target.value);
-              setSelectedPacketId(nextId);
-              setLoading(true);
-              setError('');
-              try {
-                const payload = await openLatestSongPacket(nextId);
-                applyPacketPayload(payload, true);
-                setPacketMode('existing');
-                setToast('Loaded packet.');
-                await loadPacketList();
-              } catch (err) {
-                setError(err.message || 'Failed to open packet.');
-              } finally {
-                setLoading(false);
-              }
-            }}
-            fullWidth
-          >
-            {existingPackets.map((p) => (
-              <MenuItem key={p.id} value={p.id}>
-                {p.title}
-              </MenuItem>
-            ))}
-          </TextField>
         </Stack>
       </Popover>
 
@@ -1785,6 +1684,8 @@ function App() {
             setActiveRowIndex={setActiveReviewRowIndex}
             unmatchedCount={unmatchedCount}
             duplicateRemovedCount={duplicateRemovedCount}
+            onGoBack={() => setStep(0)}
+            onGoForward={() => setStep(2)}
           />
         )}
         {step === 2 && (
@@ -1807,6 +1708,7 @@ function App() {
             onActivateVersion={handleActivatePacketVersion}
             onGenerateFromVersion={handleGenerateFromVersion}
             packetHistory={packetHistory}
+            onGoBack={() => setStep(1)}
           />
         )}
         </Box>
@@ -1820,27 +1722,7 @@ function App() {
         ) : null}
       </Box>
 
-      <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Save Packet Version</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            multiline
-            minRows={3}
-            margin="dense"
-            label="Description (optional)"
-            value={saveDescription}
-            onChange={(event) => setSaveDescription(event.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSavePacketVersion} disabled={loading}>
-            Save Version
-          </Button>
-        </DialogActions>
-      </Dialog>
+
 
       <Snackbar
         open={Boolean(toast)}

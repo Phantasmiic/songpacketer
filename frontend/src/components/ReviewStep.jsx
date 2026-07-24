@@ -165,6 +165,8 @@ function ReviewStep({
   setActiveRowIndex,
   unmatchedCount,
   duplicateRemovedCount,
+  onGoBack,
+  onGoForward,
 }) {
   const hasRows = matches.length > 0;
   const rowRefs = useRef({});
@@ -630,6 +632,21 @@ function ReviewStep({
         matches={matches}
         onSave={onUpdateMatches}
       />
+
+      {(onGoBack || onGoForward) && (
+        <Paper elevation={1} sx={{ p: 2, mt: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 2 }}>
+          {onGoBack ? (
+            <Button variant="outlined" onClick={onGoBack} sx={{ textTransform: 'none', fontWeight: 600 }}>
+              ← Back to Input
+            </Button>
+          ) : <Box />}
+          {onGoForward ? (
+            <Button variant="contained" onClick={onGoForward} sx={{ textTransform: 'none', fontWeight: 600 }}>
+              Continue to Layout →
+            </Button>
+          ) : <Box />}
+        </Paper>
+      )}
     </Box>
   );
 }

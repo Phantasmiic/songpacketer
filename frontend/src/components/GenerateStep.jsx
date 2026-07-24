@@ -32,6 +32,7 @@ function GenerateStep({
   onActivateVersion,
   onGenerateFromVersion,
   packetHistory,
+  onGoBack,
 }) {
   const [draggedCardId, setDraggedCardId] = useState('');
   const [selectedVersionId, setSelectedVersionId] = useState('');
@@ -143,6 +144,14 @@ function GenerateStep({
               ))}
             </Box>
           </Stack>
+        </Paper>
+      )}
+
+      {onGoBack && (
+        <Paper elevation={1} sx={{ p: 2, gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-start', borderRadius: 2 }}>
+          <Button variant="outlined" onClick={onGoBack} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            ← Back to Refine
+          </Button>
         </Paper>
       )}
     </Box>
