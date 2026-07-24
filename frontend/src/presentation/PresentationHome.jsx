@@ -198,7 +198,7 @@ export default function PresentationHome({
               )}
             </Box>
             {showSnippet && snippet && (
-              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', opacity: 0.8, mt: 0.5, fontSize: '0.85rem' }}>
+              <Typography variant="caption" noWrap sx={{ color: textColor, opacity: 0.7, display: 'block', mt: 0.5, fontSize: '0.85rem' }}>
                 {snippet}
               </Typography>
             )}
@@ -349,7 +349,7 @@ export default function PresentationHome({
                     {songbaseSearchResults.map((song, i) => renderSongItem(song, i, true))}
                     {songbaseSearchResults.length === 0 && (
                       <Box sx={{ p: 6, textAlign: 'center' }}>
-                        <Typography color="text.secondary" variant="h6">No matching songs found.</Typography>
+                        <Typography variant="h6" sx={{ color: textColor, opacity: 0.7 }}>No matching songs found.</Typography>
                       </Box>
                     )}
                   </Box>
