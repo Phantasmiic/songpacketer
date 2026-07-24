@@ -178,13 +178,7 @@ export default function PresentationSlide({
   const chordColor = theme.chord || '#64b5f6';
   // Window height tracking for font auto-scaling
   const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
-  const calculatedSlidePx = Math.round(windowHeight * 0.045);
 
-  useEffect(() => {
-    if (typeof setSlideAutoFontPx === 'function') {
-      setSlideAutoFontPx(calculatedSlidePx);
-    }
-  }, [calculatedSlidePx, setSlideAutoFontPx]);
 
   useEffect(() => {
     const handleResize = () => setWindowHeight(window.innerHeight);
