@@ -206,7 +206,7 @@ export async function checkSlugAvailability(slug) {
   
   const formattedSlug = formatSlug(slug);
   if (!formattedSlug || formattedSlug.length < 3) {
-    return { available: false, error: 'Slug must be at least 3 characters' };
+    return { available: false, error: 'URL must be at least 3 characters' };
   }
 
   const redisKey = getRedisKey(formattedSlug);
@@ -218,7 +218,7 @@ export async function checkSlugAvailability(slug) {
     if (!res.ok) throw new Error('Failed to query database');
     const data = await res.json();
     const exists = data.result === 1;
-    return { available: !exists, error: exists ? 'URL slug is already taken' : null };
+    return { available: !exists, error: exists ? 'URL is already taken' : null };
   } catch (err) {
     return { available: true, error: err.message };
   }
@@ -230,7 +230,7 @@ export async function savePacketOnline(slug, packetData) {
 
   const formattedSlug = formatSlug(slug);
   if (!formattedSlug || formattedSlug.length < 3) {
-    throw new Error('URL slug must be at least 3 characters');
+    throw new Error('URL must be at least 3 characters');
   }
 
   const redisKey = getRedisKey(formattedSlug);

@@ -1791,7 +1791,7 @@ function App() {
                   Save online with shareable URL
                 </Typography>
                 <Tooltip
-                  title="Saved online URLs cannot be edited directly after saving. If you make future updates to this packet, save them under a new URL slug (for example: adding _v1, _v2)."
+                  title="Packets saved to a URL cannot be edited online once created. However, you can continue editing your packet locally anytime and save it at a new URL (for example: adding _v1, _v2 to the URL)."
                   arrow
                   placement="top"
                 >
@@ -1806,7 +1806,7 @@ function App() {
           {saveOnlineEnabled && (
             <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
               <TextField
-                label="Custom URL Slug"
+                label="Custom URL"
                 size="small"
                 value={customSlug}
                 onChange={(e) => setCustomSlug(slugify(e.target.value))}

@@ -141,7 +141,7 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
 
       const res = await checkSlugAvailability('Sunday-Worship');
       expect(res.available).toBe(false);
-      expect(res.error).toBe('URL slug is already taken');
+      expect(res.error).toBe('URL is already taken');
     });
 
     it('returns available: false if slug is too short (<3 chars)', async () => {
@@ -150,7 +150,7 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
 
       const res = await checkSlugAvailability('ab');
       expect(res.available).toBe(false);
-      expect(res.error).toBe('Slug must be at least 3 characters');
+      expect(res.error).toBe('URL must be at least 3 characters');
     });
   });
 
@@ -187,7 +187,7 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
       vi.stubEnv('VITE_KV_REST_API_TOKEN', 'mock-token');
 
       await expect(savePacketOnline('a', { title: 'Test' })).rejects.toThrow(
-        'URL slug must be at least 3 characters'
+        'URL must be at least 3 characters'
       );
     });
 

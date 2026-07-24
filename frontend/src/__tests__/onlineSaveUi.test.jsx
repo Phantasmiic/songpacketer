@@ -86,8 +86,8 @@ describe('Save & Export Popover UI Integration', () => {
     fireEvent.click(onlineCheckbox);
     expect(onlineCheckbox).toBeChecked();
 
-    // Custom URL slug input should appear
-    const slugInput = screen.getByLabelText(/custom url slug/i);
+    // Custom URL input should appear
+    const slugInput = screen.getByLabelText(/custom url/i);
     expect(slugInput).toBeInTheDocument();
 
     // Should display 18-month deletion explanation
@@ -115,7 +115,7 @@ describe('Save & Export Popover UI Integration', () => {
     const onlineCheckbox = screen.getByRole('checkbox', { name: /save online with shareable url/i });
     fireEvent.click(onlineCheckbox);
 
-    const slugInput = screen.getByLabelText(/custom url slug/i);
+    const slugInput = screen.getByLabelText(/custom url/i);
     fireEvent.change(slugInput, { target: { value: 'My-Custom-Worship-Set' } });
 
     await waitFor(() => {
