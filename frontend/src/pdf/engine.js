@@ -90,6 +90,8 @@ export async function renderSongPacketPdf(
   const songNumberMap = {};
   let currentNumber = 1;
   for (const idx of drawOrder) {
+    const song = songsList[idx];
+    if (song && song.is_section) continue;
     songNumberMap[idx] = currentNumber;
     currentNumber++;
   }

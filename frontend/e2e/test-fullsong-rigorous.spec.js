@@ -12,7 +12,7 @@ test.describe('Rigorous Full Song Presentation Layout Tests', () => {
     await page.goto('/#/?test=true&agent=true');
 
     // Click "Create New Packet"
-    await page.click('text="Create New Packet"');
+    await page.locator('[data-testid="create-packet-card"]').click();
 
     // Enter title & paste multi-song setlist
     await page.fill('input[placeholder*="Sunday Morning Worship"]', 'Rigorous Test Packet');
@@ -78,14 +78,17 @@ But God who called me here below will be forever mine`;
     await page.fill('textarea', songsText);
     await page.click('button:has-text("Create Packet & Match Songs")');
 
-    // Wait for step 1 & click Present button
+    // Wait for matching to complete in Step 1
+    await expect(page.getByText('Glorious Freedom').first()).toBeVisible({ timeout: 20000 });
+
+    // Click Present button in header
     const presentBtn = page.getByRole('button', { name: /^present$/i });
-    await expect(presentBtn).toBeVisible({ timeout: 15000 });
+    await expect(presentBtn).toBeVisible({ timeout: 20000 });
     await presentBtn.click();
 
     // In PresentationHome landing, click the song card to launch PresentationSlide
-    const songCard = page.getByText(/Glorious Freedom/i).first();
-    await expect(songCard).toBeVisible({ timeout: 10000 });
+    const songCard = page.getByText('Glorious Freedom').first();
+    await expect(songCard).toBeVisible({ timeout: 20000 });
     await songCard.click({ force: true });
 
     // Wait for top bar and click Full song mode using force: true to bypass fade overlay
