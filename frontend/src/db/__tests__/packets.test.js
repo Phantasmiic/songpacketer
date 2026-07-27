@@ -74,14 +74,26 @@ describe('getSongPacket', () => {
 
 describe('listSongPackets', () => {
   it('returns a list that includes created packets', async () => {
-    await createSongPacket('Alpha Packet');
-    await createSongPacket('Beta Packet');
+    await createSongPacket('Alpha Packet', { inputText: 'alpha' });
+    await createSongPacket('Beta Packet', { inputText: 'beta' });
     const { packets } = await listSongPackets();
     const titles = packets.map((p) => p.title);
     expect(titles).toContain('Alpha Packet');
     expect(titles).toContain('Beta Packet');
   });
+
+  it('deduplicates packets with the same title (case-insensitive)', async () => {
+    const uniqueTitle = 'Dedup Title Test Unique XYZ';
+    await createSongPacket(uniqueTitle, { inputText: 'first import' });
+    await createSongPacket(uniqueTitle, { inputText: 'second import' });
+    const { packets } = await listSongPackets();
+    const matchingTitles = packets.filter(
+      (p) => p.title.toLowerCase() === uniqueTitle.toLowerCase()
+    );
+    expect(matchingTitles.length).toBe(1);
+  });
 });
+
 
 describe('updateSongPacketTitle', () => {
   it('renames a packet', async () => {

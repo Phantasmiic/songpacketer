@@ -570,6 +570,12 @@ function App() {
     setStep(nextStep);
     setActiveReviewRowIndex(0);
     setDuplicateRemovedCount(nextState.duplicate_removed_count || 0);
+    // Restore PDF layout settings (persisted since they affect the generated output)
+    if (nextState.require_one_page_per_song !== undefined) setRequireOnePagePerSong(Boolean(nextState.require_one_page_per_song));
+    if (nextState.show_page_numbers !== undefined) setShowPageNumbers(Boolean(nextState.show_page_numbers));
+    if (nextState.starting_page_number !== undefined) setStartingPageNumber(Number(nextState.starting_page_number));
+    if (nextState.page_number_prefix !== undefined) setPageNumberPrefix(String(nextState.page_number_prefix));
+    if (nextState.pdf_font_size !== undefined) setPdfFontSize(Number(nextState.pdf_font_size));
     setIsHydrating(false);
   };
 
@@ -608,6 +614,11 @@ function App() {
     packetStatsValue = packetStats,
     stepValue = step,
     duplicateRemovedCountValue = duplicateRemovedCount,
+    requireOnePagePerSongValue = requireOnePagePerSong,
+    showPageNumbersValue = showPageNumbers,
+    startingPageNumberValue = startingPageNumber,
+    pageNumberPrefixValue = pageNumberPrefix,
+    pdfFontSizeValue = pdfFontSize,
   } = {}) => {
     const cleanedMatches = cleanMatchesForSave(matchesValue);
     const baseSelections = toSelections(cleanedMatches);
@@ -641,6 +652,11 @@ function App() {
       step: stepValue,
       duplicate_removed_count: duplicateRemovedCountValue,
       selections: orderedSelections,
+      require_one_page_per_song: requireOnePagePerSongValue,
+      show_page_numbers: showPageNumbersValue,
+      starting_page_number: startingPageNumberValue,
+      page_number_prefix: pageNumberPrefixValue,
+      pdf_font_size: pdfFontSizeValue,
     };
   };
 
@@ -1178,6 +1194,59 @@ function App() {
       eventType: 'toggle_show_section_headers_in_index',
       summary: checked ? 'Enabled section headers in index' : 'Disabled section headers in index',
       change: { show_section_headers_in_index: checked },
+    });
+  };
+
+  const handleRequireOnePagePerSongChange = (checked) => {
+    setRequireOnePagePerSong(checked);
+    const snapshot = buildPacketStateSnapshot({ requireOnePagePerSongValue: checked, stepValue: 2 });
+    persistPacketState(snapshot, {
+      eventType: 'toggle_require_one_page_per_song',
+      summary: checked ? 'Enabled require one page per song' : 'Disabled require one page per song',
+      change: { require_one_page_per_song: checked },
+    });
+  };
+
+  const handleShowPageNumbersChange = (checked) => {
+    setShowPageNumbers(checked);
+    const snapshot = buildPacketStateSnapshot({ showPageNumbersValue: checked, stepValue: 2 });
+    persistPacketState(snapshot, {
+      eventType: 'toggle_show_page_numbers',
+      summary: checked ? 'Enabled page numbers' : 'Disabled page numbers',
+      change: { show_page_numbers: checked },
+    });
+  };
+
+  const handleStartingPageNumberChange = (num) => {
+    setStartingPageNumber(num);
+    const snapshot = buildPacketStateSnapshot({ startingPageNumberValue: num, stepValue: 2 });
+    persistPacketState(snapshot, {
+      eventType: 'set_starting_page_number',
+      summary: `Set starting page number to ${num}`,
+      change: { starting_page_number: num },
+    });
+  };
+
+  const handlePageNumberPrefixChange = (prefix) => {
+    setPageNumberPrefix(prefix);
+    const snapshot = buildPacketStateSnapshot({ pageNumberPrefixValue: prefix, stepValue: 2 });
+    persistPacketState(snapshot, {
+      eventType: 'set_page_number_prefix',
+      summary: `Set page number prefix to "${prefix}"`,
+      change: { page_number_prefix: prefix },
+    });
+  };
+
+  const handlePdfFontSizeChange = (updaterOrValue) => {
+    setPdfFontSize((prev) => {
+      const next = typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue;
+      const snapshot = buildPacketStateSnapshot({ pdfFontSizeValue: next, stepValue: 2 });
+      persistPacketState(snapshot, {
+        eventType: 'set_pdf_font_size',
+        summary: `Set PDF font size to ${next}pt`,
+        change: { pdf_font_size: next },
+      });
+      return next;
     });
   };
 
@@ -2014,15 +2083,15 @@ function App() {
                 showSectionHeadersInIndex={showSectionHeadersInIndex}
                 setShowSectionHeadersInIndex={handleShowSectionHeadersInIndexChange}
                 requireOnePagePerSong={requireOnePagePerSong}
-                setRequireOnePagePerSong={setRequireOnePagePerSong}
+                setRequireOnePagePerSong={handleRequireOnePagePerSongChange}
                 showPageNumbers={showPageNumbers}
-                setShowPageNumbers={setShowPageNumbers}
+                setShowPageNumbers={handleShowPageNumbersChange}
                 startingPageNumber={startingPageNumber}
-                setStartingPageNumber={setStartingPageNumber}
+                setStartingPageNumber={handleStartingPageNumberChange}
                 pageNumberPrefix={pageNumberPrefix}
-                setPageNumberPrefix={setPageNumberPrefix}
+                setPageNumberPrefix={handlePageNumberPrefixChange}
                 pdfFontSize={pdfFontSize}
-                setPdfFontSize={setPdfFontSize}
+                setPdfFontSize={handlePdfFontSizeChange}
                 error={error}
                 manualOrderCards={manualOrderCards}
                 onMoveManualCard={handleMoveManualCard}

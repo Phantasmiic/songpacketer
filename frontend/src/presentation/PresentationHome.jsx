@@ -160,6 +160,7 @@ export default function PresentationHome({
     return (
       <ListItemButton 
         key={`song-${item.song_id || item.id || index}`} 
+        data-testid="presentation-song-card"
         onClick={() => onSelectSong(item)}
         sx={{ 
           py: 1.75, 

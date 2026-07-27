@@ -218,6 +218,9 @@ function ReviewStep({
               Manage Sections
             </Button>
           </Stack>
+          <Typography variant="body2" color="text.secondary">
+            Edit song chords, lyrics, tune versions, and transpose capos—or group your list into sub-sections with custom section headers.
+          </Typography>
           
           {!hasRows && <Alert severity="info">No matches yet. Go back and run matching first.</Alert>}
           {unmatchedCount > 0 && (

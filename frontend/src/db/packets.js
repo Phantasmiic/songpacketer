@@ -6,8 +6,8 @@ const dmp = new diff_match_patch();
 export async function listSongPackets() {
   const db = await getDb();
   const allPackets = await db.getAllFromIndex('packets', 'updated_at');
-  // Return in descending order
-  const packets = allPackets.reverse().map(p => ({
+  // Return in descending order (most recently updated first)
+  const mapped = allPackets.reverse().map(p => ({
     id: p.id,
     title: p.title,
     session_key: 'local',
@@ -16,6 +16,17 @@ export async function listSongPackets() {
     created_at: new Date(p.created_at).toISOString(),
     latest_version_number: p.versions.length,
   }));
+
+  // Deduplicate: if two packets share the same title (case-insensitive), keep only
+  // the most recently updated one (which is already first after the reverse above).
+  const seenTitles = new Set();
+  const packets = mapped.filter(p => {
+    const key = p.title.toLowerCase();
+    if (seenTitles.has(key)) return false;
+    seenTitles.add(key);
+    return true;
+  });
+
   return { packets };
 }
 

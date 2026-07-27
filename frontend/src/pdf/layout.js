@@ -50,6 +50,7 @@ export function prepareSongLayout(
   if (song.is_section) {
     if (!showSectionHeadersInBody) {
       return {
+        isSection: true,
         rows: [],
         blocks: [],
         blockHeights: [],
@@ -62,6 +63,7 @@ export function prepareSongLayout(
     const titleRow = { kind: 'section_title', content: song.title };
     const h = rowHeight(titleRow, baseLineHeight); // We will treat it as default lineHeight
     return {
+      isSection: true,
       rows: [titleRow],
       blocks: [[titleRow]],
       blockHeights: [[h]],
@@ -88,19 +90,6 @@ export function prepareSongLayout(
   let totalHeight = blockHeights.reduce((sum, block) => {
     return sum + block.reduce((s, h) => s + h, 0);
   }, 0) + lineHeight;
-
-  if (requireOnePagePerSong) {
-    while (totalHeight > usableHeight && currentFontSize > 8.0) {
-      currentFontSize -= 0.5;
-      lineHeight = Math.max(9.5, baseLineHeight * (currentFontSize / Math.max(baseFontSize, 1)));
-      rows = wrappedSongRows(ctx, song, columnWidth, currentFontSize);
-      blocks = splitIntoStanzaBlocks(rows);
-      blockHeights = blocks.map(block => block.map(row => rowHeight(row, lineHeight)));
-      totalHeight = blockHeights.reduce((sum, block) => {
-        return sum + block.reduce((s, h) => s + h, 0);
-      }, 0) + lineHeight;
-    }
-  }
 
   return {
     rows,
