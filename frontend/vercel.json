@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/packet/:path*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/p/:path*",
       "destination": "/index.html"
     },

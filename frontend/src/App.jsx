@@ -302,10 +302,10 @@ function App() {
       const hash = window.location.hash;
       let slug = null;
 
-      if (pathname && pathname.startsWith('/p/')) {
-        slug = pathname.replace(/^\/p\//, '').split('?')[0].split('/')[0];
-      } else if (hash && hash.startsWith('#/p/')) {
-        slug = hash.replace('#/p/', '').split('?')[0];
+      if (pathname && (pathname.startsWith('/packet/') || pathname.startsWith('/p/'))) {
+        slug = pathname.replace(/^\/(packet|p)\//, '').split('?')[0].split('/')[0];
+      } else if (hash && (hash.startsWith('#/packet/') || hash.startsWith('#/p/'))) {
+        slug = hash.replace(/^#\/(packet|p)\//, '').split('?')[0];
       } else {
         const params = new URLSearchParams(window.location.search);
         if (params.get('packet')) {
@@ -1948,7 +1948,7 @@ function App() {
                 fullWidth
                 placeholder="sunday-service"
                 InputProps={{
-                  startAdornment: <InputAdornment position="start">/p/</InputAdornment>,
+                  startAdornment: <InputAdornment position="start">/packet/</InputAdornment>,
                 }}
                 sx={{ mb: 1 }}
               />

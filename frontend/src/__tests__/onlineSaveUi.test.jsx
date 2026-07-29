@@ -36,7 +36,7 @@ vi.mock('../api/client', async () => {
     checkSlugAvailability: vi.fn().mockResolvedValue({ available: true, error: null }),
     savePacketOnline: vi.fn().mockResolvedValue({
       slug: 'Sunday-Service-Set',
-      shareUrl: 'http://localhost:5173/p/Sunday-Service-Set'
+      shareUrl: 'http://localhost:5173/packet/Sunday-Service-Set'
     })
   };
 });
@@ -128,7 +128,7 @@ describe('Save & Export Popover UI Integration', () => {
 
     await waitFor(() => {
       expect(clientApi.savePacketOnline).toHaveBeenCalledWith('My-Custom-Song-Packet', expect.any(Object));
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('http://localhost:5173/p/Sunday-Service-Set');
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('http://localhost:5173/packet/Sunday-Service-Set');
     });
   });
 });

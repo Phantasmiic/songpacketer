@@ -289,7 +289,7 @@ export async function savePacketOnline(slug, packetData) {
   }
 
   // Preserve user casing in clean shareUrl
-  const shareUrl = `${window.location.origin}/p/${formattedSlug}`;
+  const shareUrl = `${window.location.origin}/packet/${formattedSlug}`;
   return { slug: formattedSlug, shareUrl };
 }
 
