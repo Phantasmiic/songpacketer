@@ -454,6 +454,24 @@ function App() {
 
   }, [matches, manualOrderCards, orderingMode, showSectionHeadersInIndex, requireOnePagePerSong, showPageNumbers, startingPageNumber, pageNumberPrefix, pdfFontSize, step]);
 
+  useEffect(() => {
+    if (step === 2 && matches.length > 0 && manualOrderCards.length === 0) {
+      const cards = matches
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => row.type !== 'section')
+        .map(({ row, index }, cardIdx) => ({
+          id: row.id || `card-${index}`,
+          selectionIndex: index,
+          title: row.titleOverride || row.title || row.input || `Song ${cardIdx + 1}`,
+          originalOrder: cardIdx + 1,
+          forceNewPage: Boolean(row.force_new_page),
+        }));
+      if (cards.length > 0) {
+        setManualOrderCards(cards);
+      }
+    }
+  }, [step, matches, manualOrderCards]);
+
   const primeVersionsCache = (rows) => {
     rows.forEach((row) => {
       if (row.selectedSongId && Array.isArray(row.versions) && row.versions.length > 0) {
