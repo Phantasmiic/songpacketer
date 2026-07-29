@@ -205,8 +205,8 @@ export function formatLiveSlug(text) {
 }
 
 function getKvConfig() {
-  const url = import.meta.env.VITE_KV_REST_API_URL;
-  const token = import.meta.env.VITE_KV_REST_API_TOKEN;
+  const url = import.meta.env.VITE_KV_REST_API_URL || import.meta.env.VITE_UPSTASH_REDIS_REST_URL;
+  const token = import.meta.env.VITE_KV_REST_API_TOKEN || import.meta.env.VITE_UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) {
     return null;
   }
