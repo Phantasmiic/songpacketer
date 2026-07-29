@@ -210,8 +210,9 @@ export function formatLiveSlug(text) {
 }
 
 function getKvConfig() {
-  const url = import.meta.env.VITE_KV_REST_API_URL || import.meta.env.VITE_UPSTASH_REDIS_REST_URL;
-  const token = import.meta.env.VITE_KV_REST_API_TOKEN || import.meta.env.VITE_UPSTASH_REDIS_REST_TOKEN;
+  let url = (import.meta.env.VITE_KV_REST_API_URL || import.meta.env.VITE_UPSTASH_REDIS_REST_URL || '').trim().replace(/^["']|["']$/g, '');
+  let token = (import.meta.env.VITE_KV_REST_API_TOKEN || import.meta.env.VITE_UPSTASH_REDIS_REST_TOKEN || '').trim().replace(/^["']|["']$/g, '');
+
   if (!url || !token) {
     return null;
   }
@@ -234,10 +235,18 @@ export async function checkSlugAvailability(slug) {
   const redisKey = getRedisKey(formattedSlug);
 
   try {
-    const res = await fetch(`${config.url}/exists/${redisKey}`, {
-      headers: { Authorization: `Bearer ${config.token}` }
+    const res = await fetch(config.url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(['EXISTS', redisKey])
     });
-    if (!res.ok) throw new Error('Failed to query database');
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Database error ${res.status} ${res.statusText}${errText ? `: ${errText}` : ''}`);
+    }
     const data = await res.json();
     const exists = data.result === 1;
     return { available: !exists, error: exists ? 'URL is already taken' : null };
@@ -248,7 +257,7 @@ export async function checkSlugAvailability(slug) {
 
 export async function savePacketOnline(slug, packetData) {
   const config = getKvConfig();
-  if (!config) throw new Error('Vercel KV configuration missing (VITE_KV_REST_API_URL / VITE_KV_REST_API_TOKEN)');
+  if (!config) throw new Error('Vercel KV / Upstash configuration missing (VITE_KV_REST_API_URL / VITE_KV_REST_API_TOKEN)');
 
   const formattedSlug = formatSlug(slug);
   if (!formattedSlug || formattedSlug.length < 3) {
@@ -260,12 +269,23 @@ export async function savePacketOnline(slug, packetData) {
   // Lossless LZ-String compression
   const compressed = LZString.compressToEncodedURIComponent(jsonString);
 
-  const res = await fetch(`${config.url}/set/${redisKey}/${compressed}/ex/${EIGHTEEN_MONTHS_SECONDS}`, {
-    headers: { Authorization: `Bearer ${config.token}` }
-  });
+  let res;
+  try {
+    res = await fetch(config.url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(['SET', redisKey, compressed, 'EX', EIGHTEEN_MONTHS_SECONDS])
+    });
+  } catch (netErr) {
+    throw new Error(`Database connection failed: ${netErr.message}`);
+  }
 
   if (!res.ok) {
-    throw new Error('Failed to save packet online to database');
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Failed to save packet online (${res.status} ${res.statusText}${errText ? `: ${errText}` : ''})`);
   }
 
   // Preserve user casing in shareUrl
@@ -282,28 +302,46 @@ export async function fetchPacketOnline(slug) {
 
   const redisKey = getRedisKey(formattedSlug);
 
-  const res = await fetch(`${config.url}/get/${redisKey}`, {
-    headers: { Authorization: `Bearer ${config.token}` }
-  });
+  let res;
+  try {
+    res = await fetch(config.url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(['GET', redisKey])
+    });
+  } catch (netErr) {
+    throw new Error(`Network error loading packet: ${netErr.message}`);
+  }
 
-  if (!res.ok) throw new Error('Network error loading packet');
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Failed to load packet online (${res.status} ${res.statusText}${errText ? `: ${errText}` : ''})`);
+  }
   const data = await res.json();
 
   if (!data.result) {
     throw new Error('Packet not found or expired after 18 months of inactivity');
   }
 
-  // Decompress lossless LZ-String payload
-  const decompressed = LZString.decompressFromEncodedURIComponent(data.result);
-  if (!decompressed) throw new Error('Failed to decompress packet data');
-
-  const packetObj = JSON.parse(decompressed);
+  // Decompress LZ-String
+  const decompressedJson = LZString.decompressFromEncodedURIComponent(data.result);
+  if (!decompressedJson) {
+    throw new Error('Corrupted online packet data');
+  }
 
   // Background Renewal: EXPIRE packet:<slug_lowercase> 47304000 (renew 18-month timer upon UI view)
-  fetch(`${config.url}/expire/${redisKey}/${EIGHTEEN_MONTHS_SECONDS}`, {
-    headers: { Authorization: `Bearer ${config.token}` }
+  fetch(config.url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(['EXPIRE', redisKey, EIGHTEEN_MONTHS_SECONDS])
   }).catch(() => { });
 
-  return packetObj;
+  return JSON.parse(decompressedJson);
 }
 

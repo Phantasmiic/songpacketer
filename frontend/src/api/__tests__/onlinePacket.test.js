@@ -139,7 +139,13 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
       const res = await checkSlugAvailability('Sunday-Service');
       expect(res.available).toBe(true);
       expect(res.error).toBeNull();
-      expect(globalThis.fetch).toHaveBeenCalledWith('https://mock-kv.upstash.io/exists/packet:sunday-service', expect.any(Object));
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'https://mock-kv.upstash.io',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(['EXISTS', 'packet:sunday-service'])
+        })
+      );
     });
 
     it('returns available: false if slug is taken (EXISTS returns 1)', async () => {
@@ -183,9 +189,13 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
       expect(res.shareUrl).toContain('#/p/Sunday-Service-2026');
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-      const fetchUrl = globalThis.fetch.mock.calls[0][0];
-      expect(fetchUrl).toContain('https://mock-kv.upstash.io/set/packet:sunday-service-2026/');
-      expect(fetchUrl).toContain('/ex/47304000');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'https://mock-kv.upstash.io',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"SET","packet:sunday-service-2026"')
+        })
+      );
     });
 
     it('throws error when Vercel KV configuration is missing', async () => {
@@ -194,7 +204,7 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
       vi.stubEnv('VITE_UPSTASH_REDIS_REST_URL', '');
       vi.stubEnv('VITE_UPSTASH_REDIS_REST_TOKEN', '');
       await expect(savePacketOnline('Sunday-Set', { title: 'Test' })).rejects.toThrow(
-        'Vercel KV configuration missing'
+        'Vercel KV / Upstash configuration missing'
       );
     });
 
@@ -213,11 +223,13 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
 
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
-        status: 500
+        status: 500,
+        statusText: 'Internal Server Error',
+        text: async () => 'Internal Error'
       });
 
       await expect(savePacketOnline('Sunday-Set', { title: 'Test' })).rejects.toThrow(
-        'Failed to save packet online to database'
+        'Failed to save packet online'
       );
     });
   });
@@ -230,20 +242,21 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
       const originalPacket = { title: 'Retrieved Packet', items: [1, 2, 3] };
       const compressedPayload = LZString.compressToEncodedURIComponent(JSON.stringify(originalPacket));
 
-      globalThis.fetch = vi.fn().mockImplementation((url) => {
-        if (url.includes('/get/packet:easter-2026')) {
+      globalThis.fetch = vi.fn().mockImplementation((url, options) => {
+        const bodyStr = options?.body || '';
+        if (bodyStr.includes('"GET","packet:easter-2026"')) {
           return Promise.resolve({
             ok: true,
             json: async () => ({ result: compressedPayload })
           });
         }
-        if (url.includes('/expire/packet:easter-2026')) {
+        if (bodyStr.includes('"EXPIRE","packet:easter-2026"')) {
           return Promise.resolve({
             ok: true,
             json: async () => ({ result: 1 })
           });
         }
-        return Promise.reject(new Error('Unknown URL'));
+        return Promise.reject(new Error('Unknown URL or payload'));
       });
 
       // Query with mixed case: Easter-2026
@@ -252,14 +265,20 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
 
       // Verify GET request used lowercased key packet:easter-2026
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        'https://mock-kv.upstash.io/get/packet:easter-2026',
-        expect.any(Object)
+        'https://mock-kv.upstash.io',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(['GET', 'packet:easter-2026'])
+        })
       );
 
       // Verify background EXPIRE timer renewal request was sent for 47,304,000s
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        'https://mock-kv.upstash.io/expire/packet:easter-2026/47304000',
-        expect.any(Object)
+        'https://mock-kv.upstash.io',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(['EXPIRE', 'packet:easter-2026', 47304000])
+        })
       );
     });
 
