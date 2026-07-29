@@ -1387,7 +1387,7 @@ function App() {
     if (!activePacket?.id || !newTitle.trim()) return;
     try {
       const payload = await updateSongPacketTitle(activePacket.id, newTitle.trim());
-      applyPacketPayload(payload, false); // Don't reload matching state, just update activePacket title info
+      setActivePacket(payload.packet);
       await loadPacketList();
     } catch (err) {
       setError(err.message || 'Failed to rename packet.');
@@ -1880,10 +1880,8 @@ function App() {
             label="Packet Title"
             size="small"
             value={packetTitle}
-            onChange={(e) => {
-              setPacketTitle(e.target.value);
-              handleRenameActivePacket(e.target.value);
-            }}
+            onChange={(e) => setPacketTitle(e.target.value)}
+            onBlur={(e) => handleRenameActivePacket(e.target.value)}
             fullWidth
           />
 
