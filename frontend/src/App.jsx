@@ -316,9 +316,11 @@ function App() {
 
       try {
         setLoading(true);
+        setIsHydrating(true);
         const packetData = await fetchPacketOnline(slug);
         if (packetData) {
-          await importSongPacket(packetData);
+          const payload = await importSongPacket(packetData);
+          applyPacketPayload(payload, true);
           await loadPacketList();
           setToast(`Loaded online packet: "${packetData.title || slug}"`);
         }
