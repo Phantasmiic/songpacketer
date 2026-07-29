@@ -514,9 +514,32 @@ function ReviewStep({
             };
 
             let sectionColorIndex = 0;
+            const hasSectionHeaders = matches.some((item) => item.type === 'section');
+
             return groups.map((group, groupIndex) => {
               if (group.type === 'unassigned') {
                 const color = '#757575'; // Neutral gray color for unassigned
+
+                if (!hasSectionHeaders) {
+                  return (
+                    <Box key={group.id || `unassigned-${groupIndex}`} sx={{ mt: 2.5 }}>
+                      <Stack spacing={1.8}>
+                        {group.songs.map((row) => {
+                          const rowIndex = row.originalIndex;
+                          const isExpanded = expandedCards[rowIndex];
+                          const currentSongNumber = songNumber++;
+                          return renderSongCard(row, rowIndex, currentSongNumber, isExpanded, '#1976d2');
+                        })}
+                        {group.songs.length === 0 && (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', pl: 1 }}>
+                            No songs added yet.
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Box>
+                  );
+                }
+
                 return (
                   <Box
                     key={group.id || `unassigned-${groupIndex}`}
@@ -593,18 +616,6 @@ function ReviewStep({
                         fullWidth
                       />
                     </Stack>
-                    <Button
-                      variant="text"
-                      color="error"
-                      size="small"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDeleteRow(group.originalIndex);
-                      }}
-                      sx={{ minWidth: 'auto', ml: 2 }}
-                    >
-                      Delete Section
-                    </Button>
                   </Stack>
 
                   <Stack spacing={1.8}>

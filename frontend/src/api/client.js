@@ -1,8 +1,8 @@
 import { syncSongbase as dbSyncSongbase, matchSongs as dbMatchSongs, fetchVersions as dbFetchVersions } from '../db/songs';
 import { getDb } from '../db/store';
-import { 
-  listSongPackets as dbListSongPackets, 
-  createSongPacket as dbCreateSongPacket, 
+import {
+  listSongPackets as dbListSongPackets,
+  createSongPacket as dbCreateSongPacket,
   getSongPacket as dbGetSongPacket,
   updateSongPacketState as dbUpdateSongPacketState,
   saveSongPacketVersion as dbSaveSongPacketVersion,
@@ -27,7 +27,6 @@ export async function fetchVersions(songId) {
 export async function generatePacketPdf(
   selections,
   maintainOriginalOrder = false,
-  showSectionHeadersInBody = false,
   showSectionHeadersInIndex = true,
   requireOnePagePerSong = false,
   showPageNumbers = true,
@@ -38,7 +37,6 @@ export async function generatePacketPdf(
   return await renderSongPacketPdf(
     selections,
     maintainOriginalOrder,
-    showSectionHeadersInBody,
     showSectionHeadersInIndex,
     requireOnePagePerSong,
     showPageNumbers,
@@ -72,10 +70,10 @@ export async function openLatestSongPacket(packetId) {
 
 export async function updateSongPacketState(packetId, state, event = {}) {
   return await dbUpdateSongPacketState(
-    packetId, 
+    packetId,
     state.state || state, // Handle different legacy payload shapes
-    event.event_type || '', 
-    event.summary || '', 
+    event.event_type || '',
+    event.summary || '',
     event.change || {}
   );
 }
@@ -110,7 +108,7 @@ function toSelectionsStatic(rows) {
     }
     let chordpro_text = '';
     if (Array.isArray(row.versions) && row.versions.length > 0) {
-      const selected = row.selectedVersionId 
+      const selected = row.selectedVersionId
         ? row.versions.find(v => v.id === row.selectedVersionId)
         : row.versions[0];
       if (selected) {
@@ -139,12 +137,12 @@ export async function generateSongPacketVersionPdf(packetId, versionId) {
   const versionIdx = parseInt(versionId, 10) - 1;
   const version = packet.versions[versionIdx];
   if (!version || !version.snapshot) throw new Error("Version not found or has no snapshot");
-  
+
   const matches = version.snapshot.matches || [];
   const manualOrderCards = version.snapshot.manual_order_cards || [];
-  
+
   const selections = toSelectionsStatic(manualOrderCards.length > 0 ? manualOrderCards : matches);
-  
+
   return await renderSongPacketPdf(
     selections,
     version.snapshot.maintain_original_order || false,
@@ -213,7 +211,7 @@ export function isKvConfigured() {
 export async function checkSlugAvailability(slug) {
   const config = getKvConfig();
   if (!config) return { available: true, error: null };
-  
+
   const formattedSlug = formatSlug(slug);
   if (!formattedSlug || formattedSlug.length < 3) {
     return { available: false, error: 'URL must be at least 3 characters' };
@@ -290,7 +288,7 @@ export async function fetchPacketOnline(slug) {
   // Background Renewal: EXPIRE packet:<slug_lowercase> 47304000 (renew 18-month timer upon UI view)
   fetch(`${config.url}/expire/${redisKey}/${EIGHTEEN_MONTHS_SECONDS}`, {
     headers: { Authorization: `Bearer ${config.token}` }
-  }).catch(() => {});
+  }).catch(() => { });
 
   return packetObj;
 }

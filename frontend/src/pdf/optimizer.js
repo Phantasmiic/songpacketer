@@ -44,7 +44,7 @@ export function simulateOrderMetrics(order, prepared, top, bottom, usableHeight)
   let page = 0;
   let col = 0;
   let y = top;
-  
+
   let whitespace = 0.0;
   let stanzaPageSpill = 0;
   let stanzaColSpill = 0;
@@ -84,7 +84,7 @@ export function simulateOrderMetrics(order, prepared, top, bottom, usableHeight)
     }
 
     const renderedPages = new Set();
-    
+
     for (let blockIndex = 0; blockIndex < songLayout.blocks.length; blockIndex++) {
       const block = songLayout.blocks[blockIndex];
       const blockHeights = songLayout.blockHeights[blockIndex];
@@ -112,7 +112,7 @@ export function simulateOrderMetrics(order, prepared, top, bottom, usableHeight)
       }
     }
 
-    y -= songLayout.lineHeight;
+    y -= songLayout.lineHeight * 2.0;
     if (renderedPages.size > 1) {
       songPageSpill += 1;
     }
@@ -161,7 +161,7 @@ function estimateFreeAfterSong(songLayout, top, bottom, usableHeight) {
       y -= h;
     }
   }
-  y -= songLayout.lineHeight;
+  y -= songLayout.lineHeight * 2.0;
   return Math.max(y - bottom, 0.0);
 }
 
@@ -182,14 +182,14 @@ function buildStructuredSeed(prepared, usableHeight, top, bottom, rng) {
   for (const longId of longIds) {
     order.push(longId);
     let free = estimateFreeAfterSong(prepared[longId], top, bottom, usableHeight);
-    
+
     while (true) {
       let candidates = Array.from(remaining).filter(idx => prepared[idx].totalHeight <= free);
       if (candidates.length === 0) break;
-      
+
       candidates.sort((a, b) => prepared[b].totalHeight - prepared[a].totalHeight);
       const chosen = rng.random() < 0.85 ? candidates[0] : candidates[candidates.length - 1];
-      
+
       order.push(chosen);
       remaining.delete(chosen);
       free -= prepared[chosen].totalHeight;
@@ -221,7 +221,7 @@ export function optimizeSongOrder(
   function refine(seedOrder, iterations) {
     let localBestOrder = [...seedOrder];
     let localBestMetrics = simulateOrderMetrics(localBestOrder, prepared, top, bottom, usableHeight);
-    
+
     for (let iter = 0; iter < iterations; iter++) {
       const candidate = [...localBestOrder];
       let i, j;
@@ -233,11 +233,11 @@ export function optimizeSongOrder(
         i = sample[0];
         j = sample[1];
       }
-      
+
       [candidate[i], candidate[j]] = [candidate[j], candidate[i]];
 
       const metrics = simulateOrderMetrics(candidate, prepared, top, bottom, usableHeight);
-      
+
       if (compareTuples(objectiveTuple(metrics, objectivePriority), objectiveTuple(localBestMetrics, objectivePriority)) < 0) {
         localBestOrder = candidate;
         localBestMetrics = metrics;
@@ -270,7 +270,7 @@ export function optimizeSongOrder(
   for (let i = 0; i < Math.min(6, scoredSeeds.length); i++) {
     const seed = scoredSeeds[i].seed;
     const [candidateOrder, candidateMetrics] = refine(seed, iterations);
-    
+
     if (compareTuples(objectiveTuple(candidateMetrics, objectivePriority), objectiveTuple(globalBestMetrics, objectivePriority)) < 0) {
       globalBestOrder = candidateOrder;
       globalBestMetrics = candidateMetrics;

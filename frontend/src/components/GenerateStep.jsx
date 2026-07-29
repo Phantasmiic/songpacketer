@@ -20,8 +20,6 @@ import { useEffect, useState } from 'react';
 function GenerateStep({
   maintainOriginalOrder,
   setMaintainOriginalOrder,
-  showSectionHeadersInBody,
-  setShowSectionHeadersInBody,
   showSectionHeadersInIndex,
   setShowSectionHeadersInIndex,
   requireOnePagePerSong,
@@ -150,7 +148,7 @@ function GenerateStep({
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main' }}>
                 TYPOGRAPHY & DISPLAY
               </Typography>
-              
+
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
                   Lyric Font Size:
@@ -225,15 +223,6 @@ function GenerateStep({
                     />
                   }
                   label="Show section headers in index"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={showSectionHeadersInBody}
-                      onChange={(event) => setShowSectionHeadersInBody(event.target.checked)}
-                    />
-                  }
-                  label="Show section headers in PDF body"
                 />
               </Stack>
             </Stack>

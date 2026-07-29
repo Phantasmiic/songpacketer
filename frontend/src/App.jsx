@@ -78,13 +78,15 @@ function toSelections(rows, versionsCacheRef = null) {
         return {
           type: 'section',
           title: row.title,
+          id: row.id,
+          isUnassigned: row.isUnassigned || row.id === 'unassigned',
           force_new_page: false,
         };
       }
       let chordpro_text = '';
       if (versionsCacheRef && versionsCacheRef.current[row.selectedSongId]) {
         const versions = versionsCacheRef.current[row.selectedSongId];
-        const selected = row.selectedVersionId 
+        const selected = row.selectedVersionId
           ? versions.find(v => v.id === row.selectedVersionId)
           : versions[0];
         if (selected) {
@@ -174,7 +176,6 @@ function App() {
   const [duplicateRemovedCount, setDuplicateRemovedCount] = useState(0);
   const [manualOrderCards, setManualOrderCards] = useState([]);
   const [packetStats, setPacketStats] = useState(null);
-  const [showSectionHeadersInBody, setShowSectionHeadersInBody] = useState(false);
   const [showSectionHeadersInIndex, setShowSectionHeadersInIndex] = useState(true);
   const [requireOnePagePerSong, setRequireOnePagePerSong] = useState(false);
   const [showPageNumbers, setShowPageNumbers] = useState(true);
@@ -320,7 +321,7 @@ function App() {
   useEffect(() => {
     // Save to local storage
     localStorage.setItem('presentationActive', isPresentationMode ? 'true' : 'false');
-    
+
     // Sync state to URL
     const path = window.location.pathname;
     if (isPresentationMode && path === '/') {
@@ -414,7 +415,7 @@ function App() {
     const songRows = matches.filter(r => r.type !== 'section');
     const unmatchedCount = songRows.filter((row) => !row.selectedSongId).length;
     const canProceed = songRows.length > 0 && unmatchedCount === 0;
-    
+
     if (step === 0 || !canProceed) {
       return;
     }
@@ -427,11 +428,10 @@ function App() {
       setIsGeneratingPreview(true);
       try {
         const payload = toSelections(manualOrderCards.length > 0 ? manualOrderCards : matches, versionsCacheRef);
-        
+
         const result = await generatePacketPdf(
           payload,
           maintainOriginalOrder,
-          showSectionHeadersInBody,
           showSectionHeadersInIndex,
           requireOnePagePerSong,
           showPageNumbers,
@@ -452,7 +452,7 @@ function App() {
       }
     }, 1000);
 
-  }, [matches, manualOrderCards, maintainOriginalOrder, showSectionHeadersInBody, showSectionHeadersInIndex, requireOnePagePerSong, showPageNumbers, startingPageNumber, pageNumberPrefix, pdfFontSize, step]);
+  }, [matches, manualOrderCards, maintainOriginalOrder, showSectionHeadersInIndex, requireOnePagePerSong, showPageNumbers, startingPageNumber, pageNumberPrefix, pdfFontSize, step]);
 
   const primeVersionsCache = (rows) => {
     rows.forEach((row) => {
@@ -493,12 +493,12 @@ function App() {
     const nextState = state || {};
     const nextMatches = Array.isArray(nextState.matches) ? nextState.matches : [];
     setInputText(nextState.input_text || '');
-    
+
     // Hydrate candidates and versions dynamically from IndexedDB if they are missing
     const hydratedMatches = await Promise.all(
       nextMatches.map(async (row) => {
         if (row.type === 'section') return row;
-        
+
         let candidates = row.candidates;
         // Rebuild candidates list if missing or empty
         if (!candidates || candidates.length === 0) {
@@ -558,7 +558,6 @@ function App() {
     setMatches(hydratedMatches);
     primeVersionsCache(hydratedMatches);
     setMaintainOriginalOrder(Boolean(nextState.maintain_original_order));
-    setShowSectionHeadersInBody(nextState.show_section_headers_in_body ?? false);
     setShowSectionHeadersInIndex(nextState.show_section_headers_in_index ?? true);
     setManualOrderCards(Array.isArray(nextState.manual_order_cards) ? nextState.manual_order_cards : []);
     setPacketStats(nextState.packet_stats || null);
@@ -608,7 +607,6 @@ function App() {
     inputTextValue = inputText,
     matchesValue = matches,
     maintainOrderValue = maintainOriginalOrder,
-    showSectionHeadersInBodyValue = showSectionHeadersInBody,
     showSectionHeadersInIndexValue = showSectionHeadersInIndex,
     manualCardsValue = manualOrderCards,
     packetStatsValue = packetStats,
@@ -624,28 +622,27 @@ function App() {
     const baseSelections = toSelections(cleanedMatches);
     const orderedSelections = manualCardsValue.length
       ? manualCardsValue
-          .map((card) => {
-            const base = baseSelections[card.selectionIndex];
-            if (!base) {
-              return null;
-            }
-            return {
-              ...base,
-              force_new_page: Boolean(card.forceNewPage),
-            };
-          })
-          .filter(Boolean)
+        .map((card) => {
+          const base = baseSelections[card.selectionIndex];
+          if (!base) {
+            return null;
+          }
+          return {
+            ...base,
+            force_new_page: Boolean(card.forceNewPage),
+          };
+        })
+        .filter(Boolean)
       : baseSelections.map((selection) => ({
-          ...selection,
-          force_new_page: false,
-        }));
+        ...selection,
+        force_new_page: false,
+      }));
 
     return {
       packet_title: activePacket?.title || packetTitle.trim(),
       input_text: inputTextValue,
       matches: cleanedMatches,
       maintain_original_order: maintainOrderValue,
-      show_section_headers_in_body: showSectionHeadersInBodyValue,
       show_section_headers_in_index: showSectionHeadersInIndexValue,
       manual_order_cards: manualCardsValue,
       packet_stats: packetStatsValue,
@@ -1021,7 +1018,7 @@ function App() {
         nextRows = [...nextRows, ...newSongs];
         newMatchesCount = newSongs.length;
       }
-      
+
       const copy = [...matches, ...nextRows];
       const { finalRows, removedCount } = finalizeRefinedRows(copy);
       setDuplicateRemovedCount(removedCount);
@@ -1125,7 +1122,6 @@ function App() {
       const result = await generatePacketPdf(
         orderedSelections,
         maintainOriginalOrder,
-        showSectionHeadersInBody,
         showSectionHeadersInIndex
       );
       const blob = result.blob;
@@ -1168,19 +1164,6 @@ function App() {
       eventType: 'toggle_maintain_order',
       summary: checked ? 'Enabled maintain original order' : 'Disabled maintain original order',
       change: { maintain_original_order: checked },
-    });
-  };
-
-  const handleShowSectionHeadersInBodyChange = (checked) => {
-    setShowSectionHeadersInBody(checked);
-    const snapshot = buildPacketStateSnapshot({
-      showSectionHeadersInBodyValue: checked,
-      stepValue: 2,
-    });
-    persistPacketState(snapshot, {
-      eventType: 'toggle_show_section_headers_in_body',
-      summary: checked ? 'Enabled section headers in PDF body' : 'Disabled section headers in PDF body',
-      change: { show_section_headers_in_body: checked },
     });
   };
 
@@ -1303,7 +1286,6 @@ function App() {
       const result = await generatePacketPdf(
         orderedSelections,
         maintainOriginalOrder,
-        showSectionHeadersInBody,
         showSectionHeadersInIndex
       );
       const blob = result.blob;
@@ -1414,7 +1396,7 @@ function App() {
   const handleImportPacket = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     setLoading(true);
     setIsHydrating(true);
     setError('');
@@ -1599,8 +1581,8 @@ function App() {
                       bgcolor: isCompleted
                         ? 'success.main'
                         : isActive
-                        ? 'primary.main'
-                        : 'action.disabled',
+                          ? 'primary.main'
+                          : 'action.disabled',
                       color: isCompleted || isActive ? 'white' : 'text.disabled',
                     }}
                   >
@@ -1844,10 +1826,10 @@ function App() {
           horizontal: 'right',
         }}
         PaperProps={{
-          sx: { 
-            width: 360, 
-            p: 2.5, 
-            borderRadius: 2.5, 
+          sx: {
+            width: 360,
+            p: 2.5,
+            borderRadius: 2.5,
             boxShadow: 8,
             bgcolor: 'background.paper',
             backgroundImage: 'none',
@@ -1877,10 +1859,10 @@ function App() {
 
           <FormControlLabel
             control={
-              <Checkbox 
-                checked={saveOnlineEnabled} 
-                onChange={(e) => setSaveOnlineEnabled(e.target.checked)} 
-                color="primary" 
+              <Checkbox
+                checked={saveOnlineEnabled}
+                onChange={(e) => setSaveOnlineEnabled(e.target.checked)}
+                color="primary"
                 size="small"
               />
             }
@@ -2078,8 +2060,6 @@ function App() {
               <GenerateStep
                 maintainOriginalOrder={maintainOriginalOrder}
                 setMaintainOriginalOrder={handleMaintainOriginalOrderChange}
-                showSectionHeadersInBody={showSectionHeadersInBody}
-                setShowSectionHeadersInBody={handleShowSectionHeadersInBodyChange}
                 showSectionHeadersInIndex={showSectionHeadersInIndex}
                 setShowSectionHeadersInIndex={handleShowSectionHeadersInIndexChange}
                 requireOnePagePerSong={requireOnePagePerSong}

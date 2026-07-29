@@ -65,7 +65,7 @@ describe('Save & Export Popover UI Integration', () => {
     const titleInput = screen.getByLabelText(/packet title/i);
     fireEvent.change(titleInput, { target: { value: 'Sunday Service Set' } });
 
-    const textInput = screen.getByPlaceholderText(/Lord Jesus/i);
+    const textInput = screen.getByPlaceholderText(/From my spirit/i);
     fireEvent.change(textInput, { target: { value: 'Amazing Grace' } });
 
     // Submit form to create packet
@@ -103,7 +103,7 @@ describe('Save & Export Popover UI Integration', () => {
     const titleInput = screen.getByLabelText(/packet title/i);
     fireEvent.change(titleInput, { target: { value: 'Sunday Service Set' } });
 
-    const textInput = screen.getByPlaceholderText(/Lord Jesus/i);
+    const textInput = screen.getByPlaceholderText(/From my spirit/i);
     fireEvent.change(textInput, { target: { value: 'Amazing Grace' } });
 
     const submitMatchBtn = screen.getByRole('button', { name: /create packet & match songs/i });

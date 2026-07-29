@@ -43,33 +43,18 @@ export function prepareSongLayout(
   columnWidth,
   baseFontSize,
   baseLineHeight,
-  showSectionHeadersInBody = false,
   requireOnePagePerSong = false,
   usableHeight = 648
 ) {
   if (song.is_section) {
-    if (!showSectionHeadersInBody) {
-      return {
-        isSection: true,
-        rows: [],
-        blocks: [],
-        blockHeights: [],
-        lineHeight: baseLineHeight,
-        totalHeight: 0.0,
-        fontSize: baseFontSize,
-        forceNewPage: song.force_new_page || false
-      };
-    }
-    const titleRow = { kind: 'section_title', content: song.title };
-    const h = rowHeight(titleRow, baseLineHeight); // We will treat it as default lineHeight
     return {
       isSection: true,
-      rows: [titleRow],
-      blocks: [[titleRow]],
-      blockHeights: [[h]],
+      rows: [],
+      blocks: [],
+      blockHeights: [],
       lineHeight: baseLineHeight,
-      totalHeight: h + baseLineHeight,
-      fontSize: SONG_TITLE_FONT_SIZE,
+      totalHeight: 0.0,
+      fontSize: baseFontSize,
       forceNewPage: song.force_new_page || false
     };
   }
@@ -87,9 +72,10 @@ export function prepareSongLayout(
   let lineHeight = Math.max(9.5, baseLineHeight * (currentFontSize / Math.max(baseFontSize, 1)));
   let blocks = splitIntoStanzaBlocks(rows);
   let blockHeights = blocks.map(block => block.map(row => rowHeight(row, lineHeight)));
+  let interSongSpacing = lineHeight * 2.0;
   let totalHeight = blockHeights.reduce((sum, block) => {
     return sum + block.reduce((s, h) => s + h, 0);
-  }, 0) + lineHeight;
+  }, 0) + interSongSpacing;
 
   return {
     rows,

@@ -101,7 +101,7 @@ function InputStep({
             maxRows={15}
             value={inputText}
             onChange={(event) => setInputText(event.target.value)}
-            placeholder="Lord Jesus you are Lovely&#10;Be thou my vision&#10;In Christ Alone"
+            placeholder="From my spirit within&#10;I come to His presence afresh&#10;Above the waste and emptiness"
             fullWidth
             required
           />
@@ -259,7 +259,7 @@ function InputStep({
                 borderColor: 'primary.main',
               },
             }}
-            onClick={() => setActiveView('create')}
+            onClick={() => { setPacketTitle(''); setInputText(''); setActiveView('create'); }}
           >
             <AddCircleOutlineIcon color="primary" sx={{ fontSize: 32, flexShrink: 0 }} />
             <Box sx={{ textAlign: 'left', minWidth: 0 }}>

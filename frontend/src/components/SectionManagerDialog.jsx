@@ -342,27 +342,43 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
     setCategoryOrder(order);
   }, [open, matches]);
 
+  const handleRemoveAllSections = () => {
+    const allSectionSongs = sections.flatMap((sec) => sec.songs);
+    setUnassigned((prev) => [...prev, ...allSectionSongs]);
+    setSections([]);
+    setCategoryOrder(['unassigned']);
+    setSelectedCategory('unassigned');
+    setSelectedSongIds(new Set());
+  };
+
   const handleSave = () => {
     // Rebuild flat matches array
     const flattened = [];
-    categoryOrder.forEach((catId) => {
-      if (catId === 'unassigned') {
-        if (unassigned.length > 0) {
-          flattened.push({ type: 'section', title: 'Unassigned Songs', id: 'unassigned', isUnassigned: true });
-          unassigned.forEach(({ clientRowId, ...rest }) => {
-            flattened.push(rest);
-          });
+    if (sections.length === 0) {
+      // If there are no custom sections, save flat list of songs without section header
+      unassigned.forEach(({ clientRowId, ...rest }) => {
+        flattened.push(rest);
+      });
+    } else {
+      categoryOrder.forEach((catId) => {
+        if (catId === 'unassigned') {
+          if (unassigned.length > 0) {
+            flattened.push({ type: 'section', title: 'Unassigned Songs', id: 'unassigned', isUnassigned: true });
+            unassigned.forEach(({ clientRowId, ...rest }) => {
+              flattened.push(rest);
+            });
+          }
+        } else {
+          const sec = sections.find((s) => s.id === catId);
+          if (sec) {
+            flattened.push({ type: 'section', title: sec.title, id: sec.id });
+            sec.songs.forEach(({ clientRowId, ...rest }) => {
+              flattened.push(rest);
+            });
+          }
         }
-      } else {
-        const sec = sections.find((s) => s.id === catId);
-        if (sec) {
-          flattened.push({ type: 'section', title: sec.title, id: sec.id });
-          sec.songs.forEach(({ clientRowId, ...rest }) => {
-            flattened.push(rest);
-          });
-        }
-      }
-    });
+      });
+    }
     onSave(flattened);
     onClose();
   };
@@ -696,9 +712,22 @@ export default function SectionManagerDialog({ open, onClose, matches, onSave })
             }}
           >
             <Stack spacing={1}>
-              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, px: 1, mb: 0.5 }}>
-                SECTIONS & ORDER
-              </Typography>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 1, mb: 0.5 }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                  SECTIONS & ORDER
+                </Typography>
+                {sections.length > 0 && (
+                  <Button
+                    size="small"
+                    color="error"
+                    variant="text"
+                    onClick={handleRemoveAllSections}
+                    sx={{ textTransform: 'none', fontSize: '0.725rem', py: 0, px: 0.5, minWidth: 'auto' }}
+                  >
+                    Remove All Sections
+                  </Button>
+                )}
+              </Stack>
               
                {categoryOrder.map((catId) => {
                  const showTopIndicator = draggedCategoryId !== null && dragOverCategoryId === catId && draggedCategoryId !== catId && dropPosition === 'top';

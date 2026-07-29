@@ -46,7 +46,6 @@ function extractChordRuns(chordLine) {
 export async function renderSongPacketPdf(
   songsData,
   maintainOriginalOrder = false,
-  showSectionHeadersInBody = false,
   showSectionHeadersInIndex = true,
   requireOnePagePerSong = false,
   showPageNumbers = true,
@@ -57,7 +56,7 @@ export async function renderSongPacketPdf(
   const doc = await PDFDocument.create();
   const lyricFont = await doc.embedFont(LYRIC_FONT_NAME);
   const chordFont = await doc.embedFont(CHORD_FONT_NAME);
-  
+
   const ctx = new PdfLibContext(lyricFont, chordFont);
 
   // Map input songs into RenderedSong models
@@ -85,7 +84,7 @@ export async function renderSongPacketPdf(
   const preparedLayouts = {};
   songsList.forEach((song, songIndex) => {
     preparedLayouts[songIndex] = prepareSongLayout(
-      ctx, song, columnWidth, userFontSize, lineHeight, showSectionHeadersInBody, requireOnePagePerSong, usableHeight
+      ctx, song, columnWidth, userFontSize, lineHeight, requireOnePagePerSong, usableHeight
     );
   });
 
@@ -117,9 +116,9 @@ export async function renderSongPacketPdf(
     if (song.is_section && (!showSectionHeadersInIndex || song.is_unassigned)) continue;
     entries.push({ title: song.title, number: songNumberMap[idx], is_section: song.is_section });
   }
-  
+
   // Keep entries in sequential packet order (with sections and sequential song numbers)
-  
+
   const indexTop = PAGE_HEIGHT - vMargin;
   const indexBottom = vMargin;
   const indexRightMargin = 72;
@@ -195,7 +194,7 @@ export async function renderSongPacketPdf(
       const minGap = 8.0;
 
       const titleMaxWidth = Math.max(rightX - xPosition - minGap * 2, 40.0);
-      
+
       // Simple truncation
       let titleText = entry.title;
       while (ctx.measureText(titleText, 'lyric', chosenFont) > titleMaxWidth && titleText.length > 1) {
@@ -207,14 +206,14 @@ export async function renderSongPacketPdf(
       const dotEndX = rightX - minGap;
 
       currentPageObj.drawText(titleText, { x: xPosition, y: yPosition, font: lyricFont, size: chosenFont });
-      
+
       const dotWidth = Math.max(ctx.measureText('.', 'lyric', chosenFont), 0.001);
       const dotsWidth = Math.max(dotEndX - dotStartX, 0.0);
       const dotCount = Math.floor(dotsWidth / dotWidth);
       if (dotCount > 0) {
         currentPageObj.drawText('.'.repeat(dotCount), { x: dotStartX, y: yPosition, font: lyricFont, size: chosenFont });
       }
-      
+
       currentPageObj.drawText(rightLabel, { x: rightX, y: yPosition, font: lyricFont, size: chosenFont });
       yPosition -= entryLineSpacing;
     }
@@ -246,23 +245,6 @@ export async function renderSongPacketPdf(
     const { blocks, lineHeight: songLineHeight, fontSize: songFontSize, totalHeight: songHeight } = songLayout;
 
     if (song.is_section) {
-      if (!showSectionHeadersInBody || song.is_unassigned) continue;
-      
-      if (cursor.y - bottom < songHeight) {
-        if (cursor.col === 0) {
-          cursor.col = 1; cursor.y = top;
-        } else {
-          cursor.page += 1; cursor.col = 0; cursor.y = top;
-        }
-      }
-      if (cursor.page !== currentLogicPage) {
-        currentPageObj = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-        currentLogicPage = cursor.page;
-        drawSongPageMarker(currentLogicPage);
-      }
-      
-      currentPageObj.drawText(`${songNumber}. ${song.title}`, { x: xForCol(cursor.col), y: cursor.y, font: chordFont, size: SONG_TITLE_FONT_SIZE });
-      cursor.y -= lineHeight;
       continue;
     }
 
@@ -276,6 +258,38 @@ export async function renderSongPacketPdf(
       if (cursor.col === 0) {
         cursor.col = 1; cursor.y = top;
       } else {
+        cursor.page += 1; cursor.col = 0; cursor.y = top;
+      }
+    }
+
+    // Bug 2 fix: with requireOnePagePerSong, ensure songs don't cross page boundaries
+    // unless they're longer than a full 2-column page (2 * usableHeight).
+    //
+    // Key subtlety: the bug-1 block-level look-ahead may advance the song from col 0
+    // to col 1 if the title+verse1 group (minStartH) doesn't fit in the remaining
+    // col 0 space. When that happens, the song effectively starts in col 1 alone —
+    // so "remaining on page" must reflect that, not col 0 + col 1.
+    if (requireOnePagePerSong && songHeight <= 2 * usableHeight) {
+      const free = cursor.y - bottom;
+      const b0H = blocks.length > 0
+        ? songLayout.blockHeights[0].reduce((s, h) => s + h, 0) : 0;
+      const b1H = blocks.length > 1
+        ? songLayout.blockHeights[1].reduce((s, h) => s + h, 0) : 0;
+      const minStartH = Math.min(b0H + b1H, usableHeight);
+
+      let effectiveRemaining;
+      if (cursor.col === 0) {
+        // If title+verse1 fit in remaining col 0 space, the song can use col 0 + col 1.
+        // Otherwise the block-level advance will move us to col 1 first, giving us
+        // only usableHeight of effective remaining space.
+        effectiveRemaining = free >= minStartH
+          ? free + usableHeight
+          : usableHeight;
+      } else {
+        effectiveRemaining = free;
+      }
+
+      if (songHeight > effectiveRemaining) {
         cursor.page += 1; cursor.col = 0; cursor.y = top;
       }
     }
@@ -294,7 +308,19 @@ export async function renderSongPacketPdf(
       const blockHeight = blockHeights.reduce((s, h) => s + h, 0);
       const free = cursor.y - bottom;
 
-      if (blockHeight <= usableHeight && blockHeight > free) {
+      // Bug 1 fix: when drawing block 0 (which always contains the song_number /
+      // title row), compute a "keep-with-next" minimum height: block 0 height +
+      // block 1 height. If both don't fit together in the remaining space, advance
+      // before drawing anything so the title is never stranded at column bottom.
+      // For all other blocks, simply advance if the block doesn't fit.
+      // The cursor.y < top guard prevents an infinite loop on oversized blocks.
+      let requiredFit = blockHeight;
+      if (blockIndex === 0 && blocks.length > 1) {
+        const nextBlockHeight = songLayout.blockHeights[1].reduce((s, h) => s + h, 0);
+        requiredFit = Math.min(blockHeight + nextBlockHeight, usableHeight);
+      }
+
+      if (requiredFit > free && cursor.y < top) {
         if (cursor.col === 0) {
           cursor.col = 1; cursor.y = top;
         } else {
@@ -354,7 +380,7 @@ export async function renderSongPacketPdf(
       }
     }
 
-    cursor.y -= songLineHeight;
+    cursor.y -= songLineHeight * 2.0;
     if (renderedPages.size > 1) {
       songPageSpill += 1;
     }

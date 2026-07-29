@@ -72,7 +72,7 @@ describe('Song 5 keep-with-next regression', () => {
     const preparedLayouts = {};
     songsList.forEach((song, songIndex) => {
       preparedLayouts[songIndex] = prepareSongLayout(
-        ctx, song, columnWidth, userFontSize, lineHeight, showSectionHeadersInBody, requireOnePagePerSong, usableHeight
+        ctx, song, columnWidth, userFontSize, lineHeight, requireOnePagePerSong, usableHeight
       );
     });
 
@@ -103,13 +103,6 @@ describe('Song 5 keep-with-next regression', () => {
       const { blocks, lineHeight: songLineHeight, fontSize: songFontSize, totalHeight: songHeight } = songLayout;
 
       if (song.is_section) {
-        if (!showSectionHeadersInBody || song.is_unassigned) continue;
-        if (cursor.y - bottom < songHeight) {
-          if (cursor.col === 0) { cursor.col = 1; cursor.y = top; }
-          else { cursor.page += 1; cursor.col = 0; cursor.y = top; }
-        }
-        if (cursor.page !== currentLogicPage) currentLogicPage = cursor.page;
-        cursor.y -= lineHeight;
         continue;
       }
 
@@ -189,7 +182,7 @@ describe('Song 5 keep-with-next regression', () => {
         }
       }
 
-      cursor.y -= songLineHeight;
+      cursor.y -= songLineHeight * 2.0;
 
       songPositions[songNumber] = {
         title: song.title,

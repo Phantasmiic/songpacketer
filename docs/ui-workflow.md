@@ -23,6 +23,7 @@ Per-song controls:
 - Capo numeric spinner (min 0)
 - Reset body override button
 - Expand/collapse multiline chord/lyric editor
+- **Section Manager Modal**: Drag-and-drop category organization, section creation/deletion, and a **Remove All Sections** button to clear all sections and restore flat song optimization.
 
 Feedback loops:
 

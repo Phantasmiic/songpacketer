@@ -54,35 +54,23 @@ describe('prepareSongLayout', () => {
     // chord -> 14
     // lyric -> 14
     // total block height: 46.2
-    // total height: 46.2 + 14 = 60.2
+    // total height: 46.2 + 28 = 74.2
     
     expect(layout.blocks).toHaveLength(1);
     expect(layout.blockHeights).toEqual([[18.2, 14, 14]]);
-    expect(layout.totalHeight).toBeCloseTo(60.2);
+    expect(layout.totalHeight).toBeCloseTo(74.2);
     expect(layout.fontSize).toBe(11);
     expect(layout.lineHeight).toBe(14);
   });
 
-  it('handles sections appropriately when hidden', () => {
+  it('handles sections appropriately', () => {
     const song = {
       is_section: true,
       title: 'Hymns',
     };
     
-    const layout = prepareSongLayout(mockCtx, song, 100, 11, 14, false);
+    const layout = prepareSongLayout(mockCtx, song, 100, 11, 14);
     expect(layout.totalHeight).toBe(0);
     expect(layout.blocks).toEqual([]);
-  });
-
-  it('handles sections appropriately when shown', () => {
-    const song = {
-      is_section: true,
-      title: 'Hymns',
-    };
-    
-    const layout = prepareSongLayout(mockCtx, song, 100, 11, 14, true);
-    // 1 title row. Height = 14. Total = 14 + 14 = 28.
-    expect(layout.totalHeight).toBe(28);
-    expect(layout.blocks).toHaveLength(1);
   });
 });

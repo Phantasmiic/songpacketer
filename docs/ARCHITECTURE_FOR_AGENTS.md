@@ -74,9 +74,10 @@ frontend/
 The PDF engine replaces server-side generation with pixel-perfect client-side rendering using `pdf-lib`:
 
 1. **`wrapping.js`**: Calculates exact text metrics for monospace/proportional fonts. Aligns chord placements above lyrics without breaking word boundaries.
-2. **`chordpro.js`**: Parses inline ChordPro bracket notation (`[C]Amazing [G]grace`).
-3. **`optimizer.js`**: Evaluates layout cost functions (penalizing song page splits, unnecessary blank space, and index overflow) using simulated annealing.
-4. **`engine.js`**: Renders headers, page numbers, dynamic index table of contents, and final byte array.
+2. **`layout.js`**: Calculates stanza block heights, row heights, and inter-song spacing (`2.0 * lineHeight`) between consecutive songs in a column.
+3. **`chordpro.js`**: Parses inline ChordPro bracket notation (`[C]Amazing [G]grace`).
+4. **`optimizer.js`**: Evaluates layout cost functions (penalizing song page splits, unnecessary blank space, and index overflow) using simulated annealing.
+5. **`engine.js`**: Renders headers, page numbers, dynamic index table of contents, inter-song column gaps, and final byte array.
 
 ---
 
