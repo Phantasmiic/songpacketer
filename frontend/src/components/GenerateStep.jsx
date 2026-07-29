@@ -79,8 +79,16 @@ function GenerateStep({
     }
   };
 
+  const [enableForceNewPagePerSong, setEnableForceNewPagePerSong] = useState(false);
+
+  useEffect(() => {
+    if (manualOrderCards && manualOrderCards.some(card => card.forceNewPage)) {
+      setEnableForceNewPagePerSong(true);
+    }
+  }, [manualOrderCards]);
+
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: manualOrderCards.length > 0 ? '45% 55%' : '1fr' }, gap: 2 }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
       <Paper elevation={2} sx={{ p: 3 }}>
         <Stack spacing={2.5}>
           <Typography variant="h6">Packet Layout & PDF Settings</Typography>
@@ -92,27 +100,108 @@ function GenerateStep({
 
           {/* SECTION 1: PAGE FITTING & BOUNDARIES */}
           <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
-            <Stack spacing={1}>
+            <Stack spacing={1.5}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 0.75 }}>
                 PAGE FITTING & BOUNDARIES
               </Typography>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={requireOnePagePerSong}
-                    onChange={(event) => setRequireOnePagePerSong(event.target.checked)}
-                    color="primary"
-                  />
-                }
-                label={
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Require each song to fit entirely on one page
-                  </Typography>
-                }
-              />
-              <Typography variant="caption" color="text.secondary" sx={{ pl: 4, display: 'block', mt: -0.5 }}>
-                Pushes songs to start on a fresh page to avoid mid-song breaks. Adheres to your selected font size; if a song is too long to fit at the set font size, it may eventually go to the next page.
-              </Typography>
+
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={requireOnePagePerSong}
+                      onChange={(event) => setRequireOnePagePerSong(event.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Require each song to fit entirely on one page
+                    </Typography>
+                  }
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ pl: 4, display: 'block', mt: -0.5 }}>
+                  Pushes songs to start on a fresh page to avoid mid-song breaks. Adheres to your selected font size; if a song is too long to fit at the set font size, it may eventually go to the next page.
+                </Typography>
+              </Box>
+
+              <Box sx={{ mt: 0.5 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={enableForceNewPagePerSong}
+                      onChange={(e) => setEnableForceNewPagePerSong(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Force specific songs to start on a new page
+                    </Typography>
+                  }
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ pl: 4, display: 'block', mt: -0.5 }}>
+                  Select individual songs to force them onto a fresh page or column.
+                </Typography>
+
+                {enableForceNewPagePerSong && manualOrderCards.length > 0 && (
+                  <Box
+                    sx={{
+                      mt: 1.5,
+                      ml: 4,
+                      p: 1,
+                      bgcolor: 'background.paper',
+                      borderRadius: 1.5,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      maxHeight: 220,
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 0.5
+                    }}
+                  >
+                    {manualOrderCards.map((card, index) => (
+                      <Box
+                        key={card.id}
+                        onClick={() => onToggleForceNewPage(card.id)}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: 1,
+                          cursor: 'pointer',
+                          bgcolor: card.forceNewPage ? 'action.selected' : 'transparent',
+                          '&:hover': { bgcolor: 'action.hover' }
+                        }}
+                      >
+                        <Checkbox
+                          size="small"
+                          checked={Boolean(card.forceNewPage)}
+                          onChange={() => onToggleForceNewPage(card.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          color="primary"
+                          sx={{ p: 0.25 }}
+                        />
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: card.forceNewPage ? 700 : 400,
+                            fontSize: '0.825rem',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          {index + 1}. {card.title}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
             </Stack>
           </Paper>
 
@@ -289,61 +378,7 @@ function GenerateStep({
         </Stack>
       </Paper>
 
-      {manualOrderCards.length > 0 && (
-        <Paper elevation={2} sx={{ p: 3 }}>
-          <Stack spacing={1.5}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Manual Song Order</Typography>
-              <Button
-                variant="contained"
-                size="small"
-                onClick={onRegenerateFromManualOrder}
-                disabled={loading}
-              >
-                Re-generate PDF
-              </Button>
-            </Stack>
-            <Typography variant="body2" color="text.secondary">
-              Drag cards to reorder songs. Toggle force new page per song.
-            </Typography>
 
-            <Box sx={{ maxHeight: '60vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1.25, pr: 0.5 }}>
-              {manualOrderCards.map((card, index) => (
-                <Paper
-                  key={card.id}
-                  variant="outlined"
-                  draggable
-                  onDragStart={() => setDraggedCardId(card.id)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => {
-                    onMoveManualCard(draggedCardId, card.id);
-                    setDraggedCardId('');
-                  }}
-                  onDragEnd={() => setDraggedCardId('')}
-                  sx={{ p: 1.5, cursor: 'grab', bgcolor: '#fff', '&:hover': { bgcolor: '#fafafa' } }}
-                >
-                  <Stack spacing={1}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {index + 1}. {card.title}
-                      </Typography>
-                      <Chip size="small" label={`Original ${card.originalOrder}`} />
-                    </Stack>
-                    <Button
-                      size="small"
-                      variant={card.forceNewPage ? 'contained' : 'outlined'}
-                      onClick={() => onToggleForceNewPage(card.id)}
-                      sx={{ alignSelf: 'flex-start', textTransform: 'none' }}
-                    >
-                      Force new page
-                    </Button>
-                  </Stack>
-                </Paper>
-              ))}
-            </Box>
-          </Stack>
-        </Paper>
-      )}
 
       {onGoBack && (
         <Paper elevation={1} sx={{ p: 2, gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-start', borderRadius: 2 }}>
