@@ -110,13 +110,26 @@ export default function PresentationMode({ packetDetails, isSongbaseMode = false
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDraggingTextSize, setIsDraggingTextSize] = useState(false);
   
-  // Customization presets & custom colors
-  const [themeMode, setThemeMode] = useState('dark'); // 'dark', 'light', 'sepia', 'custom'
-  const [customColors, setCustomColors] = useState({
-    bg: '#000000',
-    text: '#ffffff',
-    chord: '#64b5f6',
+  // Customization presets & custom colors with localStorage persistence
+  const [themeMode, setThemeMode] = useState(() => {
+    return localStorage.getItem('presentationThemeMode') || 'dark';
   });
+  const [customColors, setCustomColors] = useState(() => {
+    try {
+      const saved = localStorage.getItem('presentationCustomColors');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    const mode = localStorage.getItem('presentationThemeMode') || 'dark';
+    return PRESET_THEMES[mode] || PRESET_THEMES.dark;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('presentationThemeMode', themeMode);
+  }, [themeMode]);
+
+  useEffect(() => {
+    localStorage.setItem('presentationCustomColors', JSON.stringify(customColors));
+  }, [customColors]);
   
   const [showChords, setShowChords] = useState(() => {
     return localStorage.getItem('presentationShowChords') === 'true';
@@ -331,6 +344,9 @@ export default function PresentationMode({ packetDetails, isSongbaseMode = false
                 value={themeMode}
                 label="Select Theme"
                 onChange={(e) => handlePresetChange(e.target.value)}
+                MenuProps={{
+                  sx: { zIndex: 14000 }
+                }}
               >
                 <MenuItem value="dark">Dark (Black / White / Blue)</MenuItem>
                 <MenuItem value="light">Light (White / Black / Dark Blue)</MenuItem>
