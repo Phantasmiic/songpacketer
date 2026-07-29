@@ -176,8 +176,13 @@ const EIGHTEEN_MONTHS_SECONDS = 47304000; // 18 months (547.5 days) in seconds
 
 export function formatSlug(text) {
   if (!text) return '';
-  return text
-    .toString()
+  let str = text.toString();
+  try {
+    str = decodeURIComponent(str);
+  } catch (e) {
+    // Ignore decode error if malformed string
+  }
+  return str
     .trim()
     .replace(/\s+/g, '-')
     .replace(/[^\w\-]+/g, '')

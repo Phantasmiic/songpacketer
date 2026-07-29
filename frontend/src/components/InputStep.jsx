@@ -76,7 +76,7 @@ function InputStep({
               Back to Menu
             </Button>
           </Stack>
-          
+
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
               Create New Song Packet
@@ -92,7 +92,7 @@ function InputStep({
             onChange={(event) => setPacketTitle(event.target.value)}
             required
             fullWidth
-            placeholder="e.g. Sunday Morning Service"
+            placeholder="e.g. Fall Conference"
           />
 
           <TextField
@@ -169,12 +169,12 @@ function InputStep({
                 filteredPackets.map((packet, index) => (
                   <Box key={packet.id}>
                     {index > 0 && <Divider />}
-                    <ListItemButton 
-                      onClick={() => onOpenExisting(packet.id)} 
+                    <ListItemButton
+                      onClick={() => onOpenExisting(packet.id)}
                       sx={{ py: 1.5, px: 2.5 }}
                       secondaryAction={
-                        <IconButton 
-                          edge="end" 
+                        <IconButton
+                          edge="end"
                           aria-label="delete"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -219,14 +219,14 @@ function InputStep({
             <Button onClick={() => setPacketToDelete(null)} color="primary">
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 if (packetToDelete) {
                   onDeletePacket(packetToDelete.id);
                   setPacketToDelete(null);
                 }
-              }} 
-              color="error" 
+              }}
+              color="error"
               autoFocus
             >
               Delete

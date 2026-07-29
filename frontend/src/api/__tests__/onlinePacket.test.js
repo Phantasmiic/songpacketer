@@ -46,6 +46,10 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
 
   describe('isKvConfigured helper', () => {
     it('returns false when environment variables are missing', () => {
+      vi.stubEnv('VITE_KV_REST_API_URL', '');
+      vi.stubEnv('VITE_KV_REST_API_TOKEN', '');
+      vi.stubEnv('VITE_UPSTASH_REDIS_REST_URL', '');
+      vi.stubEnv('VITE_UPSTASH_REDIS_REST_TOKEN', '');
       expect(isKvConfigured()).toBe(false);
     });
 
@@ -185,6 +189,10 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
     });
 
     it('throws error when Vercel KV configuration is missing', async () => {
+      vi.stubEnv('VITE_KV_REST_API_URL', '');
+      vi.stubEnv('VITE_KV_REST_API_TOKEN', '');
+      vi.stubEnv('VITE_UPSTASH_REDIS_REST_URL', '');
+      vi.stubEnv('VITE_UPSTASH_REDIS_REST_TOKEN', '');
       await expect(savePacketOnline('Sunday-Set', { title: 'Test' })).rejects.toThrow(
         'Vercel KV configuration missing'
       );
