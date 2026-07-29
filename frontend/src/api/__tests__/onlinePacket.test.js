@@ -186,7 +186,7 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
       const res = await savePacketOnline('Sunday-Service-2026', packet);
 
       expect(res.slug).toBe('Sunday-Service-2026');
-      expect(res.shareUrl).toContain('#/p/Sunday-Service-2026');
+      expect(res.shareUrl).toContain('/p/Sunday-Service-2026');
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
       expect(globalThis.fetch).toHaveBeenCalledWith(

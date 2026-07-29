@@ -298,9 +298,13 @@ function App() {
   // Load online packet if URL contains #/p/:slug or ?packet=:slug
   useEffect(() => {
     async function checkOnlineRoute() {
+      const pathname = window.location.pathname;
       const hash = window.location.hash;
       let slug = null;
-      if (hash && hash.startsWith('#/p/')) {
+
+      if (pathname && pathname.startsWith('/p/')) {
+        slug = pathname.replace(/^\/p\//, '').split('?')[0].split('/')[0];
+      } else if (hash && hash.startsWith('#/p/')) {
         slug = hash.replace('#/p/', '').split('?')[0];
       } else {
         const params = new URLSearchParams(window.location.search);

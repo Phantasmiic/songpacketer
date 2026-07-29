@@ -288,8 +288,8 @@ export async function savePacketOnline(slug, packetData) {
     throw new Error(`Failed to save packet online (${res.status} ${res.statusText}${errText ? `: ${errText}` : ''})`);
   }
 
-  // Preserve user casing in shareUrl
-  const shareUrl = `${window.location.origin}${window.location.pathname}#/p/${formattedSlug}`;
+  // Preserve user casing in clean shareUrl
+  const shareUrl = `${window.location.origin}/p/${formattedSlug}`;
   return { slug: formattedSlug, shareUrl };
 }
 
