@@ -1942,7 +1942,7 @@ function App() {
                 label="Custom URL"
                 size="small"
                 value={customSlug}
-                onChange={(e) => setCustomSlug(formatLiveSlug(e.target.value))}
+                onChange={(e) => setCustomSlug(e.target.value)}
                 fullWidth
                 placeholder="sunday-service"
                 InputProps={{
