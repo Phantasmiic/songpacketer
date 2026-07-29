@@ -26,7 +26,7 @@ export async function fetchVersions(songId) {
 
 export async function generatePacketPdf(
   selections,
-  maintainOriginalOrder = false,
+  orderingMode = 'within_sections',
   showSectionHeadersInIndex = true,
   requireOnePagePerSong = false,
   showPageNumbers = true,
@@ -36,7 +36,7 @@ export async function generatePacketPdf(
 ) {
   return await renderSongPacketPdf(
     selections,
-    maintainOriginalOrder,
+    orderingMode,
     showSectionHeadersInIndex,
     requireOnePagePerSong,
     showPageNumbers,

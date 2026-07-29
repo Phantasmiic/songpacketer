@@ -171,7 +171,7 @@ function App() {
   };
 
   const [toast, setToast] = useState('');
-  const [maintainOriginalOrder, setMaintainOriginalOrder] = useState(false);
+  const [orderingMode, setOrderingMode] = useState('within_sections');
   const [activeReviewRowIndex, setActiveReviewRowIndex] = useState(0);
   const [duplicateRemovedCount, setDuplicateRemovedCount] = useState(0);
   const [manualOrderCards, setManualOrderCards] = useState([]);
@@ -431,7 +431,7 @@ function App() {
 
         const result = await generatePacketPdf(
           payload,
-          maintainOriginalOrder,
+          orderingMode,
           showSectionHeadersInIndex,
           requireOnePagePerSong,
           showPageNumbers,
@@ -452,7 +452,7 @@ function App() {
       }
     }, 1000);
 
-  }, [matches, manualOrderCards, maintainOriginalOrder, showSectionHeadersInIndex, requireOnePagePerSong, showPageNumbers, startingPageNumber, pageNumberPrefix, pdfFontSize, step]);
+  }, [matches, manualOrderCards, orderingMode, showSectionHeadersInIndex, requireOnePagePerSong, showPageNumbers, startingPageNumber, pageNumberPrefix, pdfFontSize, step]);
 
   const primeVersionsCache = (rows) => {
     rows.forEach((row) => {
@@ -557,7 +557,8 @@ function App() {
 
     setMatches(hydratedMatches);
     primeVersionsCache(hydratedMatches);
-    setMaintainOriginalOrder(Boolean(nextState.maintain_original_order));
+    const restoredOrderingMode = nextState.ordering_mode || (nextState.maintain_original_order ? 'original' : 'within_sections');
+    setOrderingMode(restoredOrderingMode);
     setShowSectionHeadersInIndex(nextState.show_section_headers_in_index ?? true);
     setManualOrderCards(Array.isArray(nextState.manual_order_cards) ? nextState.manual_order_cards : []);
     setPacketStats(nextState.packet_stats || null);
@@ -606,7 +607,7 @@ function App() {
   const buildPacketStateSnapshot = ({
     inputTextValue = inputText,
     matchesValue = matches,
-    maintainOrderValue = maintainOriginalOrder,
+    orderingModeValue = orderingMode,
     showSectionHeadersInIndexValue = showSectionHeadersInIndex,
     manualCardsValue = manualOrderCards,
     packetStatsValue = packetStats,
@@ -642,7 +643,8 @@ function App() {
       packet_title: activePacket?.title || packetTitle.trim(),
       input_text: inputTextValue,
       matches: cleanedMatches,
-      maintain_original_order: maintainOrderValue,
+      ordering_mode: orderingModeValue,
+      maintain_original_order: orderingModeValue === 'original',
       show_section_headers_in_index: showSectionHeadersInIndexValue,
       manual_order_cards: manualCardsValue,
       packet_stats: packetStatsValue,
@@ -1154,16 +1156,16 @@ function App() {
     }
   };
 
-  const handleMaintainOriginalOrderChange = (checked) => {
-    setMaintainOriginalOrder(checked);
+  const handleOrderingModeChange = (mode) => {
+    setOrderingMode(mode);
     const snapshot = buildPacketStateSnapshot({
-      maintainOrderValue: checked,
+      orderingModeValue: mode,
       stepValue: 2,
     });
     persistPacketState(snapshot, {
-      eventType: 'toggle_maintain_order',
-      summary: checked ? 'Enabled maintain original order' : 'Disabled maintain original order',
-      change: { maintain_original_order: checked },
+      eventType: 'change_ordering_mode',
+      summary: `Set ordering mode to ${mode}`,
+      change: { ordering_mode: mode, maintain_original_order: mode === 'original' },
     });
   };
 
@@ -1285,7 +1287,7 @@ function App() {
       }));
       const result = await generatePacketPdf(
         orderedSelections,
-        maintainOriginalOrder,
+        orderingMode,
         showSectionHeadersInIndex
       );
       const blob = result.blob;
@@ -2058,8 +2060,8 @@ function App() {
             )}
             {step === 2 && (
               <GenerateStep
-                maintainOriginalOrder={maintainOriginalOrder}
-                setMaintainOriginalOrder={handleMaintainOriginalOrderChange}
+                orderingMode={orderingMode}
+                setOrderingMode={handleOrderingModeChange}
                 showSectionHeadersInIndex={showSectionHeadersInIndex}
                 setShowSectionHeadersInIndex={handleShowSectionHeadersInIndexChange}
                 requireOnePagePerSong={requireOnePagePerSong}

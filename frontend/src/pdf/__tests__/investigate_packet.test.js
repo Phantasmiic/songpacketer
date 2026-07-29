@@ -40,15 +40,16 @@ describe('Investigate Song Packet Layout', () => {
     const pdfFontSize = 11;
     const userFontSize = Math.max(6, Math.min(24, pdfFontSize));
     const lineHeight = userFontSize * (14.0 / 11.0);
+    const showSectionHeadersInBody = packetData.current_state.show_section_headers_in_body || false;
     const requireOnePagePerSong = true;
     const maintainOriginalOrder = true;
 
-    console.log(`Settings: maintainOriginalOrder=${maintainOriginalOrder}, requireOnePagePerSong=${requireOnePagePerSong}`);
+    console.log(`Settings: maintainOriginalOrder=${maintainOriginalOrder}, showSectionHeadersInBody=${showSectionHeadersInBody}, requireOnePagePerSong=${requireOnePagePerSong}`);
 
     const preparedLayouts = {};
     songsList.forEach((song, songIndex) => {
       let layout = prepareSongLayout(
-        dummyCtx, song, columnWidth, userFontSize, lineHeight, requireOnePagePerSong, usableHeight
+        dummyCtx, song, columnWidth, userFontSize, lineHeight, showSectionHeadersInBody, requireOnePagePerSong, usableHeight
       );
 
       // If requireOnePagePerSong is enabled, try shrinking font size (down to 9pt) so the song fits in a single 1-column height (usableHeight) if close
@@ -58,7 +59,7 @@ describe('Investigate Song Packet Layout', () => {
           fSize -= 0.5;
           const candidateLh = fSize * (14.0 / 11.0);
           const candidateLayout = prepareSongLayout(
-            dummyCtx, song, columnWidth, fSize, candidateLh, requireOnePagePerSong, usableHeight
+            dummyCtx, song, columnWidth, fSize, candidateLh, showSectionHeadersInBody, requireOnePagePerSong, usableHeight
           );
           if (candidateLayout.totalHeight <= usableHeight) {
             layout = candidateLayout;
@@ -83,7 +84,7 @@ describe('Investigate Song Packet Layout', () => {
       currentNumber++;
     }
 
-    console.log("Draw order items:", drawOrder.map(i => `${i}:${songsList[i].is_section ? 'SEC:'+songsList[i].title : songsList[i].title}`));
+    console.log("Draw order items:", drawOrder.map(i => `${i}:${songsList[i].is_section ? 'SEC:' + songsList[i].title : songsList[i].title}`));
 
     let cursor = { page: 0, col: 0, y: top };
 
@@ -156,9 +157,9 @@ describe('Investigate Song Packet Layout', () => {
           cursor.y -= h;
         }
       }
-      cursor.y -= songLayout.lineHeight * 2.0;
+      cursor.y -= songLayout.lineHeight;
 
-      console.log(`Song #${String(songNumber).padStart(2)} (idx ${String(songIndex).padStart(2)}, font=${songLayout.fontSize}pt, h=${songHeight.toFixed(1).padStart(5)}pt): "${song.title}" -> start(P${actualStartPage+1}, C${actualStartCol}, Y${actualStartY.toFixed(1)}) | end(P${cursor.page+1}, C${cursor.col}, Y${cursor.y.toFixed(1)})`);
+      console.log(`Song #${String(songNumber).padStart(2)} (idx ${String(songIndex).padStart(2)}, font=${songLayout.fontSize}pt, h=${songHeight.toFixed(1).padStart(5)}pt): "${song.title}" -> start(P${actualStartPage + 1}, C${actualStartCol}, Y${actualStartY.toFixed(1)}) | end(P${cursor.page + 1}, C${cursor.col}, Y${cursor.y.toFixed(1)})`);
     }
   });
 });

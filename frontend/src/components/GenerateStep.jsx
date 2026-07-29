@@ -8,6 +8,8 @@ import {
   IconButton,
   MenuItem,
   Paper,
+  Radio,
+  RadioGroup,
   Stack,
   TextField,
   Tooltip,
@@ -18,8 +20,8 @@ import RemoveIcon from '@mui/icons-material/Remove';
 import { useEffect, useState } from 'react';
 
 function GenerateStep({
-  maintainOriginalOrder,
-  setMaintainOriginalOrder,
+  orderingMode = 'within_sections',
+  setOrderingMode,
   showSectionHeadersInIndex,
   setShowSectionHeadersInIndex,
   requireOnePagePerSong,
@@ -116,29 +118,59 @@ function GenerateStep({
 
           {/* SECTION 2: SONG ARRANGEMENT & ORDERING */}
           <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
-            <Stack spacing={1}>
+            <Stack spacing={1.5}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 0.75 }}>
                 SONG ARRANGEMENT & ORDERING
               </Typography>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={maintainOriginalOrder}
-                    onChange={(event) => setMaintainOriginalOrder(event.target.checked)}
-                    color="primary"
-                  />
-                }
-                label={
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Maintain original list order
-                  </Typography>
-                }
-              />
-              <Typography variant="caption" color="text.secondary" sx={{ pl: 4, display: 'block', mt: -0.5 }}>
-                {maintainOriginalOrder
-                  ? 'Printing in exact 1, 2, 3... input order without automatic reordering.'
-                  : 'Automatic layout optimizer active: pairs short and long songs together to eliminate empty whitespace.'}
-              </Typography>
+              <RadioGroup
+                value={orderingMode}
+                onChange={(e) => setOrderingMode(e.target.value)}
+              >
+                <FormControlLabel
+                  value="within_sections"
+                  control={<Radio size="small" color="primary" />}
+                  label={
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Optimize Within Sections (Recommended)
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Reorders songs inside each section to fit pages efficiently, keeping section headers and boundaries intact.
+                      </Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  value="original"
+                  control={<Radio size="small" color="primary" />}
+                  label={
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Keep Exact Original Order
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Preserves manual setlist sequence without reordering songs.
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ mt: 1 }}
+                />
+                <FormControlLabel
+                  value="global"
+                  control={<Radio size="small" color="primary" />}
+                  label={
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Global Compact Optimization
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Reorders songs across the whole packet for maximum page compression.
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ mt: 1 }}
+                />
+              </RadioGroup>
             </Stack>
           </Paper>
 
@@ -218,11 +250,28 @@ function GenerateStep({
                 <FormControlLabel
                   control={
                     <Checkbox
-                      checked={showSectionHeadersInIndex}
+                      checked={orderingMode !== 'global' && showSectionHeadersInIndex}
+                      disabled={orderingMode === 'global'}
                       onChange={(event) => setShowSectionHeadersInIndex(event.target.checked)}
+                      color="primary"
                     />
                   }
-                  label="Show section headers in index"
+                  label={
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Show section headers in index
+                      </Typography>
+                      {orderingMode === 'global' ? (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          Unavailable during global compact optimization because songs are reordered across section boundaries.
+                        </Typography>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          Displays section titles above song groups in the PDF table of contents.
+                        </Typography>
+                      )}
+                    </Box>
+                  }
                 />
               </Stack>
             </Stack>

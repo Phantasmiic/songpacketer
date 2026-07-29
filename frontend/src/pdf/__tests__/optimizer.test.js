@@ -85,7 +85,36 @@ describe('optimizeSongOrder', () => {
     };
     
     // Usable is 650.
-    const order = optimizeSongOrder(prepared, false, 700, 50, 650, 10);
+    const order = optimizeSongOrder(prepared, 'global', 700, 50, 650, 10);
     expect(order).toEqual(['0', '1']);
+  });
+
+  it('optimizes order within section boundaries when in within_sections mode', () => {
+    // 0: Section 1 Header
+    // 1: Song A (total 100)
+    // 2: Song B (total 600)
+    // 3: Section 2 Header
+    // 4: Song C (total 200)
+    // 5: Song D (total 600)
+    const prepared = {
+      0: { isSection: true, totalHeight: 0 },
+      1: { totalHeight: 100, blocks: [[{}]], blockHeights: [[100]], lineHeight: 14 },
+      2: { totalHeight: 600, blocks: [[{}]], blockHeights: [[600]], lineHeight: 14 },
+      3: { isSection: true, totalHeight: 0 },
+      4: { totalHeight: 200, blocks: [[{}]], blockHeights: [[200]], lineHeight: 14 },
+      5: { totalHeight: 600, blocks: [[{}]], blockHeights: [[600]], lineHeight: 14 }
+    };
+
+    const order = optimizeSongOrder(prepared, 'within_sections', 700, 50, 650, 10);
+    
+    // Section headers 0 and 3 must stay in position 0 and 3
+    expect(order[0]).toBe('0');
+    expect(order[3]).toBe('3');
+
+    // Section 1 songs {1, 2} must stay in Section 1 (positions 1 and 2)
+    expect(new Set([order[1], order[2]])).toEqual(new Set(['1', '2']));
+
+    // Section 2 songs {4, 5} must stay in Section 2 (positions 4 and 5)
+    expect(new Set([order[4], order[5]])).toEqual(new Set(['4', '5']));
   });
 });

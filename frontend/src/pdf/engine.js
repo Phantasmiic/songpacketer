@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { chordproToLines } from './chordpro';
 import { prepareSongLayout } from './layout';
-import { optimizeSongOrder } from './optimizer';
+import { evaluateLayout, solveBinPackedOrder, PAGE_WIDTH, PAGE_HEIGHT, DEFAULT_MARGIN_TOP, DEFAULT_MARGIN_BOTTOM } from './layoutSolver';
 
 const LYRIC_FONT_NAME = StandardFonts.Helvetica;
 const CHORD_FONT_NAME = StandardFonts.HelveticaBold;
@@ -9,8 +9,6 @@ const TEXT_FONT_SIZE = 11;
 const SONG_TITLE_FONT_SIZE = 15;
 const LEFT_MARGIN = 72;   // 1.0in
 const RIGHT_MARGIN = 36;  // 0.5in
-const PAGE_WIDTH = 612;   // LETTER width (8.5 * 72)
-const PAGE_HEIGHT = 792;  // LETTER height (11 * 72)
 
 class PdfLibContext {
   constructor(lyricFont, chordFont) {
@@ -45,7 +43,7 @@ function extractChordRuns(chordLine) {
 
 export async function renderSongPacketPdf(
   songsData,
-  maintainOriginalOrder = false,
+  orderingMode = 'within_sections',
   showSectionHeadersInIndex = true,
   requireOnePagePerSong = false,
   showPageNumbers = true,
@@ -70,14 +68,14 @@ export async function renderSongPacketPdf(
     is_unassigned: song.type === 'section' && (song.id === 'unassigned' || song.isUnassigned)
   }));
 
-  const vMargin = 72;
+  const vMargin = DEFAULT_MARGIN_BOTTOM;
   const userFontSize = Math.max(6, Math.min(24, pdfFontSize || TEXT_FONT_SIZE));
   const lineHeight = userFontSize * (14.0 / 11.0);
   const centerX = PAGE_WIDTH / 2.0;
   const leftColumnWidth = centerX - LEFT_MARGIN;
   const rightColumnWidth = PAGE_WIDTH - RIGHT_MARGIN - centerX;
   const columnWidth = Math.min(leftColumnWidth, rightColumnWidth);
-  const top = PAGE_HEIGHT - vMargin;
+  const top = PAGE_HEIGHT - DEFAULT_MARGIN_TOP;
   const bottom = vMargin;
   const usableHeight = top - bottom;
 
@@ -88,9 +86,9 @@ export async function renderSongPacketPdf(
     );
   });
 
-  const drawOrder = optimizeSongOrder(
-    preparedLayouts, maintainOriginalOrder, top, bottom, usableHeight
-  );
+  const solverMode = (orderingMode === true || orderingMode === 'original') ? 'original' : (orderingMode || 'within_sections');
+  const drawOrder = solveBinPackedOrder(preparedLayouts, solverMode, { top, bottom, usableHeight, requireOnePagePerSong });
+  const layoutEval = evaluateLayout(preparedLayouts, drawOrder, { top, bottom, usableHeight, requireOnePagePerSong });
 
   const songNumberMap = {};
   let currentNumber = 1;
@@ -101,23 +99,39 @@ export async function renderSongPacketPdf(
     currentNumber++;
   }
 
-  let currentPageObj = null;
+  const pagesMap = {};
 
-  function ensurePage() {
-    if (!currentPageObj) {
-      currentPageObj = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  function getOrCreatePage(pageIndex) {
+    if (!pagesMap[pageIndex]) {
+      pagesMap[pageIndex] = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      if (pageIndex >= indexPageCount) {
+        drawSongPageMarker(pagesMap[pageIndex], pageIndex - indexPageCount);
+      }
     }
+    return pagesMap[pageIndex];
+  }
+
+  function xForCol(col) {
+    return col === 0 ? LEFT_MARGIN : centerX;
+  }
+
+  function drawSongPageMarker(pageObj, pageIndex) {
+    if (!showPageNumbers) return;
+    const pageNum = (startingPageNumber || 1) + pageIndex;
+    const prefix = pageNumberPrefix !== undefined ? pageNumberPrefix : 'S';
+    const text = `${prefix}${pageNum}`;
+    const tw = ctx.measureText(text, 'chord', 10);
+    pageObj.drawText(text, { x: PAGE_WIDTH / 2.0 - tw / 2.0, y: vMargin / 2, font: chordFont, size: 10 });
   }
 
   // --- DRAW INDEX PAGES ---
+  const isGlobalOptimization = orderingMode === 'global';
   const entries = [];
   for (const idx of drawOrder) {
     const song = songsList[idx];
-    if (song.is_section && (!showSectionHeadersInIndex || song.is_unassigned)) continue;
+    if (song.is_section && (!showSectionHeadersInIndex || isGlobalOptimization || song.is_unassigned)) continue;
     entries.push({ title: song.title, number: songNumberMap[idx], is_section: song.is_section });
   }
-
-  // Keep entries in sequential packet order (with sections and sequential song numbers)
 
   const indexTop = PAGE_HEIGHT - vMargin;
   const indexBottom = vMargin;
@@ -126,7 +140,6 @@ export async function renderSongPacketPdf(
   let xPosition = LEFT_MARGIN;
   let yPosition = indexTop;
 
-  // Simplistic index font scaling
   let chosenFont = TEXT_FONT_SIZE;
   let chosenSpacing = 6.0;
   const availableHeight = Math.max((indexTop - indexBottom) - (lineHeight * 2.0), 1.0);
@@ -171,23 +184,36 @@ export async function renderSongPacketPdf(
 
   const entryLineSpacing = chosenFont + chosenSpacing;
 
+  let indexPageCount = 0;
+
   if (entries.length > 0) {
-    ensurePage();
-    currentPageObj.drawText('Song Index', { x: LEFT_MARGIN, y: yPosition, font: chordFont, size: 14 });
+    let currentIndexPageIndex = 0;
+    const indexPageObj = getOrCreatePage(currentIndexPageIndex);
+    indexPageObj.drawText('Song Index', { x: LEFT_MARGIN, y: yPosition, font: chordFont, size: 14 });
     yPosition -= lineHeight * 2.0;
 
     for (const entry of entries) {
       if (entry.is_section) {
         yPosition -= lineHeight * 0.5;
         if (yPosition < indexBottom) {
-          currentPageObj = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+          currentIndexPageIndex += 1;
+          const pageObj = getOrCreatePage(currentIndexPageIndex);
           yPosition = indexTop;
+          pageObj.drawText(entry.title, { x: xPosition, y: yPosition, font: chordFont, size: chosenFont });
+        } else {
+          const pageObj = getOrCreatePage(currentIndexPageIndex);
+          pageObj.drawText(entry.title, { x: xPosition, y: yPosition, font: chordFont, size: chosenFont });
         }
-        currentPageObj.drawText(entry.title, { x: xPosition, y: yPosition, font: chordFont, size: chosenFont });
         yPosition -= lineHeight;
         continue;
       }
 
+      if (yPosition < indexBottom) {
+        currentIndexPageIndex += 1;
+        yPosition = indexTop;
+      }
+
+      const activeIndexPage = getOrCreatePage(currentIndexPageIndex);
       const rightLabel = `Song ${entry.number}`;
       const rightWidth = ctx.measureText(rightLabel, 'lyric', chosenFont);
       const rightX = xPosition + indexColWidth - rightWidth;
@@ -195,7 +221,6 @@ export async function renderSongPacketPdf(
 
       const titleMaxWidth = Math.max(rightX - xPosition - minGap * 2, 40.0);
 
-      // Simple truncation
       let titleText = entry.title;
       while (ctx.measureText(titleText, 'lyric', chosenFont) > titleMaxWidth && titleText.length > 1) {
         titleText = titleText.substring(0, titleText.length - 1);
@@ -205,163 +230,49 @@ export async function renderSongPacketPdf(
       const dotStartX = xPosition + titleWidth + minGap;
       const dotEndX = rightX - minGap;
 
-      currentPageObj.drawText(titleText, { x: xPosition, y: yPosition, font: lyricFont, size: chosenFont });
+      activeIndexPage.drawText(titleText, { x: xPosition, y: yPosition, font: lyricFont, size: chosenFont });
 
       const dotWidth = Math.max(ctx.measureText('.', 'lyric', chosenFont), 0.001);
       const dotsWidth = Math.max(dotEndX - dotStartX, 0.0);
       const dotCount = Math.floor(dotsWidth / dotWidth);
       if (dotCount > 0) {
-        currentPageObj.drawText('.'.repeat(dotCount), { x: dotStartX, y: yPosition, font: lyricFont, size: chosenFont });
+        activeIndexPage.drawText('.'.repeat(dotCount), { x: dotStartX, y: yPosition, font: lyricFont, size: chosenFont });
       }
 
-      currentPageObj.drawText(rightLabel, { x: rightX, y: yPosition, font: lyricFont, size: chosenFont });
+      activeIndexPage.drawText(rightLabel, { x: rightX, y: yPosition, font: lyricFont, size: chosenFont });
       yPosition -= entryLineSpacing;
     }
+
+    indexPageCount = currentIndexPageIndex + 1;
   }
 
-  // --- DRAW SONGS ---
-  let cursor = { page: 0, col: 0, y: top };
-  let currentLogicPage = -1; // -1 forces new page immediately for songs
+  // --- DRAW SONGS DIRECTLY FROM SOLVER PLACEMENTS ---
+  for (const placement of layoutEval.placements) {
+    if (placement.isSection) continue;
 
-  let songPageSpill = 0;
-
-  function xForCol(col) {
-    return col === 0 ? LEFT_MARGIN : centerX;
-  }
-
-  function drawSongPageMarker(pageIndex) {
-    if (!showPageNumbers) return;
-    const pageNum = (startingPageNumber || 1) + pageIndex;
-    const prefix = pageNumberPrefix !== undefined ? pageNumberPrefix : 'S';
-    const text = `${prefix}${pageNum}`;
-    const tw = ctx.measureText(text, 'chord', 10);
-    currentPageObj.drawText(text, { x: PAGE_WIDTH / 2.0 - tw / 2.0, y: vMargin / 2, font: chordFont, size: 10 });
-  }
-
-  for (const songIndex of drawOrder) {
+    const songIndex = placement.songKey;
     const song = songsList[songIndex];
     const songNumber = songNumberMap[songIndex];
     const songLayout = preparedLayouts[songIndex];
-    const { blocks, lineHeight: songLineHeight, fontSize: songFontSize, totalHeight: songHeight } = songLayout;
+    const songFontSize = songLayout.fontSize;
 
-    if (song.is_section) {
-      continue;
-    }
+    for (const bPlacement of placement.blockPlacements) {
+      const pageObj = getOrCreatePage(bPlacement.pageIndex + indexPageCount);
+      const currentX = xForCol(bPlacement.colIndex);
+      let currentY = bPlacement.startY;
 
-    if (song.force_new_page && (cursor.col !== 0 || cursor.y < top)) {
-      cursor.page += 1;
-      cursor.col = 0;
-      cursor.y = top;
-    }
-
-    if (songHeight <= usableHeight && songHeight > (cursor.y - bottom)) {
-      if (cursor.col === 0) {
-        cursor.col = 1; cursor.y = top;
-      } else {
-        cursor.page += 1; cursor.col = 0; cursor.y = top;
-      }
-    }
-
-    // Bug 2 fix: with requireOnePagePerSong, ensure songs don't cross page boundaries
-    // unless they're longer than a full 2-column page (2 * usableHeight).
-    //
-    // Key subtlety: the bug-1 block-level look-ahead may advance the song from col 0
-    // to col 1 if the title+verse1 group (minStartH) doesn't fit in the remaining
-    // col 0 space. When that happens, the song effectively starts in col 1 alone —
-    // so "remaining on page" must reflect that, not col 0 + col 1.
-    if (requireOnePagePerSong && songHeight <= 2 * usableHeight) {
-      const free = cursor.y - bottom;
-      const b0H = blocks.length > 0
-        ? songLayout.blockHeights[0].reduce((s, h) => s + h, 0) : 0;
-      const b1H = blocks.length > 1
-        ? songLayout.blockHeights[1].reduce((s, h) => s + h, 0) : 0;
-      const minStartH = Math.min(b0H + b1H, usableHeight);
-
-      let effectiveRemaining;
-      if (cursor.col === 0) {
-        // If title+verse1 fit in remaining col 0 space, the song can use col 0 + col 1.
-        // Otherwise the block-level advance will move us to col 1 first, giving us
-        // only usableHeight of effective remaining space.
-        effectiveRemaining = free >= minStartH
-          ? free + usableHeight
-          : usableHeight;
-      } else {
-        effectiveRemaining = free;
+      function drawBoldText(xPos, yPos, txt, size) {
+        pageObj.drawText(txt, { x: xPos, y: yPos, font: chordFont, size });
       }
 
-      if (songHeight > effectiveRemaining) {
-        cursor.page += 1; cursor.col = 0; cursor.y = top;
-      }
-    }
-
-    if (cursor.page !== currentLogicPage) {
-      currentPageObj = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      currentLogicPage = cursor.page;
-      drawSongPageMarker(currentLogicPage);
-    }
-
-    const renderedPages = new Set();
-
-    for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
-      const block = blocks[blockIndex];
-      const blockHeights = songLayout.blockHeights[blockIndex];
-      const blockHeight = blockHeights.reduce((s, h) => s + h, 0);
-      const free = cursor.y - bottom;
-
-      // Bug 1 fix: when drawing block 0 (which always contains the song_number /
-      // title row), compute a "keep-with-next" minimum height: block 0 height +
-      // block 1 height. If both don't fit together in the remaining space, advance
-      // before drawing anything so the title is never stranded at column bottom.
-      // For all other blocks, simply advance if the block doesn't fit.
-      // The cursor.y < top guard prevents an infinite loop on oversized blocks.
-      let requiredFit = blockHeight;
-      if (blockIndex === 0 && blocks.length > 1) {
-        const nextBlockHeight = songLayout.blockHeights[1].reduce((s, h) => s + h, 0);
-        requiredFit = Math.min(blockHeight + nextBlockHeight, usableHeight);
-      }
-
-      if (requiredFit > free && cursor.y < top) {
-        if (cursor.col === 0) {
-          cursor.col = 1; cursor.y = top;
-        } else {
-          cursor.page += 1; cursor.col = 0; cursor.y = top;
-        }
-        if (cursor.page !== currentLogicPage) {
-          currentPageObj = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-          currentLogicPage = cursor.page;
-          drawSongPageMarker(currentLogicPage);
-        }
-      }
-
-      for (let rowIndex = 0; rowIndex < block.length; rowIndex++) {
-        const row = block[rowIndex];
-        const h = blockHeights[rowIndex];
-
-        if (h > (cursor.y - bottom)) {
-          if (cursor.col === 0) {
-            cursor.col = 1; cursor.y = top;
-          } else {
-            cursor.page += 1; cursor.col = 0; cursor.y = top;
-          }
-          if (cursor.page !== currentLogicPage) {
-            currentPageObj = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-            currentLogicPage = cursor.page;
-            drawSongPageMarker(currentLogicPage);
-          }
-        }
-
-        const currentX = xForCol(cursor.col);
-        const currentY = cursor.y;
-
-        function drawBoldText(xPos, yPos, txt, size) {
-          currentPageObj.drawText(txt, { x: xPos, y: yPos, font: chordFont, size });
-          // Pseudo-bold stroke logic removed for pdf-lib since we have HelveticaBold
-        }
+      for (let rIndex = 0; rIndex < bPlacement.rows.length; rIndex++) {
+        const row = bPlacement.rows[rIndex];
+        const h = bPlacement.heights[rIndex];
 
         if (row.kind === 'song_number') {
           drawBoldText(currentX, currentY, `Song ${songNumber}`, SONG_TITLE_FONT_SIZE);
         } else if (row.kind === 'capo') {
-          currentPageObj.drawText(`Capo ${song.capo}`, { x: currentX, y: currentY, font: lyricFont, size: TEXT_FONT_SIZE });
+          pageObj.drawText(`Capo ${song.capo}`, { x: currentX, y: currentY, font: lyricFont, size: TEXT_FONT_SIZE });
         } else if (row.kind === 'chord') {
           let lastRightX = currentX;
           for (const [anchorIdx, chordText] of extractChordRuns(row.chord)) {
@@ -372,26 +283,22 @@ export async function renderSongPacketPdf(
             lastRightX = targetX + ctx.measureText(chordText, 'chord', songFontSize) + 1.0;
           }
         } else {
-          currentPageObj.drawText(row.lyric, { x: currentX, y: currentY, font: lyricFont, size: songFontSize });
+          pageObj.drawText(row.lyric, { x: currentX, y: currentY, font: lyricFont, size: songFontSize });
         }
 
-        renderedPages.add(cursor.page);
-        cursor.y -= h;
+        currentY -= h;
       }
-    }
-
-    cursor.y -= songLineHeight * 2.0;
-    if (renderedPages.size > 1) {
-      songPageSpill += 1;
     }
   }
 
   const pdfBytes = await doc.save();
+  const maxPageIdx = Math.max(0, ...Object.keys(pagesMap).map(Number));
+
   return {
     blob: new Blob([pdfBytes], { type: 'application/pdf' }),
     stats: {
-      pages: currentLogicPage + 1,
-      songSpills: songPageSpill
+      pages: maxPageIdx + 1,
+      songSpills: layoutEval.stats.song_page_spill
     }
   };
 }
