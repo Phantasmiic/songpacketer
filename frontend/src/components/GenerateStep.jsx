@@ -177,17 +177,17 @@ function GenerateStep({
                 <Box
                   sx={{
                     mt: 1,
-                    ml: 4,
+                    ml: { xs: 0, sm: 4 },
                     p: 1,
                     bgcolor: 'background.paper',
                     borderRadius: 1.5,
                     border: '1px solid',
                     borderColor: 'divider',
-                    maxHeight: 220,
+                    maxHeight: 260,
                     overflowY: 'auto',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 0.5
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                    gap: 0.75
                   }}
                 >
                   {manualOrderCards.map((card, index) => (
@@ -197,12 +197,15 @@ function GenerateStep({
                       sx={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 1,
-                        px: 1,
-                        py: 0.5,
+                        gap: 0.75,
+                        px: 0.75,
+                        py: 0.25,
                         borderRadius: 1,
                         cursor: 'pointer',
+                        userSelect: 'none',
                         bgcolor: card.forceNewPage ? 'action.selected' : 'transparent',
+                        border: '1px solid',
+                        borderColor: card.forceNewPage ? 'primary.light' : 'transparent',
                         '&:hover': { bgcolor: 'action.hover' }
                       }}
                     >
