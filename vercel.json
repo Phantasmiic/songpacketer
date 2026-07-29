@@ -5,6 +5,10 @@
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
+      "source": "/api/songbase/:path*",
+      "destination": "https://songbase.life/api/v2/:path*"
+    },
+    {
       "source": "/packet/:path*",
       "destination": "/index.html"
     },

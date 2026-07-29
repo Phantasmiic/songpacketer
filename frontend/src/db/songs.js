@@ -107,7 +107,7 @@ function safeTuneName(tuneName, tuneIndex, seen) {
 
 export async function syncSongbase() {
   // Use the Vite proxy configured in vite.config.js to bypass CORS
-  const url = 'https://songbase.life/api/songbase/app_data?language=english&updated_at=0';
+  const url = '/api/songbase/app_data?language=english&updated_at=0';
   const response = await fetch(url);
   if (!response.ok) {
     const text = await response.text();
