@@ -6,7 +6,7 @@ import SectionManagerDialog from '../components/SectionManagerDialog';
 
 describe('SectionManagerDialog - Remove All Sections & Flat Saving', () => {
   const initialMatches = [
-    { type: 'section', title: 'Worship Flow', id: 'sec-1' },
+    { type: 'section', title: 'Fellowship Section', id: 'sec-1' },
     { input: 'Amazing Grace', selectedSongId: 's1' },
     { input: 'How Great Is Our God', selectedSongId: 's2' },
   ];

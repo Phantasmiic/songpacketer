@@ -274,7 +274,7 @@ function App() {
   // Automatically format custom slug when popover opens or packet title changes
   useEffect(() => {
     if (packetMenuAnchor) {
-      setCustomSlug(slugify(packetTitle || 'worship-packet'));
+      setCustomSlug(slugify(packetTitle || 'song-packet'));
     }
   }, [packetMenuAnchor]);
 
@@ -1943,7 +1943,7 @@ function App() {
                 value={customSlug}
                 onChange={(e) => setCustomSlug(slugify(e.target.value))}
                 fullWidth
-                placeholder="sunday-worship"
+                placeholder="sunday-service"
                 InputProps={{
                   startAdornment: <InputAdornment position="start">/p/</InputAdornment>,
                 }}

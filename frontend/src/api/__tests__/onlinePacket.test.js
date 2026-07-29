@@ -22,17 +22,17 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
 
   describe('formatSlug & getRedisKey helpers', () => {
     it('preserves uppercase letters for display while normalizing Redis keys to lowercase', () => {
-      expect(formatSlug('Sunday Morning Worship!')).toBe('Sunday-Morning-Worship');
+      expect(formatSlug('Sunday Morning Service!')).toBe('Sunday-Morning-Service');
       expect(formatSlug('  Easter-2026 -- Set 1  ')).toBe('Easter-2026-Set-1');
       expect(formatSlug('Grace @ High#Point ($1)')).toBe('Grace-HighPoint-1');
       expect(formatSlug('')).toBe('');
 
-      expect(getRedisKey('Sunday-Morning-Worship')).toBe('packet:sunday-morning-worship');
+      expect(getRedisKey('Sunday-Morning-Service')).toBe('packet:sunday-morning-service');
       expect(getRedisKey('EASTER-2026')).toBe('packet:easter-2026');
     });
 
     it('slugify alias behaves identically to formatSlug', () => {
-      expect(slugify('Youth Worship 2026')).toBe('Youth-Worship-2026');
+      expect(slugify('Youth Retreat 2026')).toBe('Youth-Retreat-2026');
     });
   });
 
@@ -52,7 +52,7 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
     it('guarantees 100% byte-for-byte lossless compression & decompression of complex packet JSON', () => {
       const originalPacket = {
         version: '1.0',
-        title: 'Sunday Morning Worship',
+        title: 'Sunday Morning Service',
         updated_at: '2026-07-24T09:45:00.000Z',
         matches: [
           {
@@ -66,7 +66,7 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
           },
           {
             type: 'section',
-            title: 'Worship Flow Section 1',
+            title: 'Fellowship Flow Section 1',
             force_new_page: false
           }
         ]
@@ -124,10 +124,10 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
         json: async () => ({ result: 0 })
       });
 
-      const res = await checkSlugAvailability('Sunday-Worship');
+      const res = await checkSlugAvailability('Sunday-Service');
       expect(res.available).toBe(true);
       expect(res.error).toBeNull();
-      expect(globalThis.fetch).toHaveBeenCalledWith('https://mock-kv.upstash.io/exists/packet:sunday-worship', expect.any(Object));
+      expect(globalThis.fetch).toHaveBeenCalledWith('https://mock-kv.upstash.io/exists/packet:sunday-service', expect.any(Object));
     });
 
     it('returns available: false if slug is taken (EXISTS returns 1)', async () => {
@@ -139,7 +139,7 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
         json: async () => ({ result: 1 })
       });
 
-      const res = await checkSlugAvailability('Sunday-Worship');
+      const res = await checkSlugAvailability('Sunday-Service');
       expect(res.available).toBe(false);
       expect(res.error).toBe('URL is already taken');
     });
@@ -164,15 +164,15 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
         json: async () => ({ result: 'OK' })
       });
 
-      const packet = { title: 'Sunday Worship Set', songs: ['Song 1', 'Song 2'] };
-      const res = await savePacketOnline('Sunday-Worship-2026', packet);
+      const packet = { title: 'Sunday Song Packet', songs: ['Song 1', 'Song 2'] };
+      const res = await savePacketOnline('Sunday-Service-2026', packet);
 
-      expect(res.slug).toBe('Sunday-Worship-2026');
-      expect(res.shareUrl).toContain('#/p/Sunday-Worship-2026');
+      expect(res.slug).toBe('Sunday-Service-2026');
+      expect(res.shareUrl).toContain('#/p/Sunday-Service-2026');
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
       const fetchUrl = globalThis.fetch.mock.calls[0][0];
-      expect(fetchUrl).toContain('https://mock-kv.upstash.io/set/packet:sunday-worship-2026/');
+      expect(fetchUrl).toContain('https://mock-kv.upstash.io/set/packet:sunday-service-2026/');
       expect(fetchUrl).toContain('/ex/47304000');
     });
 

@@ -61,7 +61,7 @@ frontend/
 
 ### Step 2: Refine & Edit (`ReviewStep.jsx`)
 - User selects specific song versions, sets capo/transposition, or edits custom ChordPro text overrides.
-- Custom setlist sections ("Worship Flow Headers") can be inserted between songs.
+- Custom setlist sections ("Section Headers") can be inserted between songs.
 
 ### Step 3: Layout & Optimization (`GenerateStep.jsx`)
 - `optimizePacketOrder(selections)` runs simulated annealing to arrange songs into the most space-efficient page layout.

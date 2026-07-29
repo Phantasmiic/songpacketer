@@ -116,10 +116,10 @@ describe('Save & Export Popover UI Integration', () => {
     fireEvent.click(onlineCheckbox);
 
     const slugInput = screen.getByLabelText(/custom url/i);
-    fireEvent.change(slugInput, { target: { value: 'My-Custom-Worship-Set' } });
+    fireEvent.change(slugInput, { target: { value: 'My-Custom-Song-Packet' } });
 
     await waitFor(() => {
-      expect(clientApi.checkSlugAvailability).toHaveBeenCalledWith('My-Custom-Worship-Set');
+      expect(clientApi.checkSlugAvailability).toHaveBeenCalledWith('My-Custom-Song-Packet');
     });
 
     const submitBtn = screen.getByRole('button', { name: /save online & copy link/i });
@@ -127,7 +127,7 @@ describe('Save & Export Popover UI Integration', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(clientApi.savePacketOnline).toHaveBeenCalledWith('My-Custom-Worship-Set', expect.any(Object));
+      expect(clientApi.savePacketOnline).toHaveBeenCalledWith('My-Custom-Song-Packet', expect.any(Object));
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('http://localhost:5173/#/p/Sunday-Service-Set');
     });
   });

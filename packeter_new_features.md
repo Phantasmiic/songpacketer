@@ -10,7 +10,7 @@ Use this specification in your new workspace to ensure all core features are imp
 
 
 ### 1. Section Headers & Groupings [x]
-Allow users to create groupings or sections inside the packet (e.g., "Sunday Morning Worship", "Midweek Retreat"). 
+Allow users to create groupings or sections inside the packet (e.g., "Sunday Morning Service", "Midweek Retreat"). 
 
 - **Frontend**: 
   - Add an "Add Section" modal to paste and assign multiple songs into a specific section.

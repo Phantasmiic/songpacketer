@@ -45,8 +45,8 @@ import {
 
 describe('createSongPacket', () => {
   it('creates a packet and returns it with correct title', async () => {
-    const result = await createSongPacket('My Worship Set');
-    expect(result.packet.title).toBe('My Worship Set');
+    const result = await createSongPacket('My Song Packet');
+    expect(result.packet.title).toBe('My Song Packet');
     expect(typeof result.packet.id).toBe('number');
     expect(result.versions).toEqual([]);
     expect(result.edit_history).toHaveLength(1);

@@ -92,7 +92,7 @@ function InputStep({
             onChange={(event) => setPacketTitle(event.target.value)}
             required
             fullWidth
-            placeholder="e.g. Sunday Morning Worship"
+            placeholder="e.g. Sunday Morning Service"
           />
 
           <TextField
