@@ -70,10 +70,20 @@ import {
 
 const steps = ['Input', 'Refine', 'Layout'];
 
-function toSelections(rows, versionsCacheRef = null) {
+function toSelections(rows, versionsCacheRef = null, manualOrderCards = []) {
+  const forceMap = {};
+  if (Array.isArray(manualOrderCards)) {
+    manualOrderCards.forEach((c) => {
+      if (c && c.selectionIndex != null) {
+        forceMap[c.selectionIndex] = Boolean(c.forceNewPage);
+      }
+    });
+  }
+
   return rows
-    .filter((row) => row.type === 'section' || row.selectedSongId)
-    .map((row) => {
+    .map((row, idx) => ({ row, idx }))
+    .filter(({ row }) => row.type === 'section' || row.selectedSongId)
+    .map(({ row, idx }) => {
       if (row.type === 'section') {
         return {
           type: 'section',
@@ -84,7 +94,7 @@ function toSelections(rows, versionsCacheRef = null) {
         };
       }
       let chordpro_text = '';
-      if (versionsCacheRef && versionsCacheRef.current[row.selectedSongId]) {
+      if (versionsCacheRef && versionsCacheRef.current && versionsCacheRef.current[row.selectedSongId]) {
         const versions = versionsCacheRef.current[row.selectedSongId];
         const selected = row.selectedVersionId
           ? versions.find(v => v.id === row.selectedVersionId)
@@ -102,6 +112,7 @@ function toSelections(rows, versionsCacheRef = null) {
         chordpro_override: row.chordproOverride || '',
         title_override: row.titleOverride || '',
         chordpro_text: chordpro_text,
+        force_new_page: forceMap[idx] !== undefined ? forceMap[idx] : Boolean(row.force_new_page),
       };
     });
 }
@@ -427,7 +438,7 @@ function App() {
     previewTimerRef.current = setTimeout(async () => {
       setIsGeneratingPreview(true);
       try {
-        const payload = toSelections(manualOrderCards.length > 0 ? manualOrderCards : matches, versionsCacheRef);
+        const payload = toSelections(matches, versionsCacheRef, manualOrderCards);
 
         const result = await generatePacketPdf(
           payload,
@@ -2132,7 +2143,7 @@ function App() {
         <PresentationMode
           isLoading={isHydrating}
           isSongbaseMode={isSongbasePresenting}
-          packetDetails={isSongbasePresenting ? songbaseSongs : toSelections(manualOrderCards.length > 0 ? manualOrderCards : matches, versionsCacheRef)}
+          packetDetails={isSongbasePresenting ? songbaseSongs : toSelections(matches, versionsCacheRef, manualOrderCards)}
           onClose={() => {
             setIsPresentationMode(false);
             setIsSongbasePresenting(false);
