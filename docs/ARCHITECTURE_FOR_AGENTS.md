@@ -98,15 +98,15 @@ When the user switches to **Full Song** mode:
 
 ---
 
-## 6. Online Packet Storage & Expiration (`Vercel KV`)
+## 6. Online Packet Storage & Expiration (`Vercel KV / Upstash Redis`)
 
 Packets can be saved online without a custom backend server:
 
-- **Storage Engine**: Vercel KV (Upstash Redis) HTTP REST API.
+- **Storage Engine**: Vercel KV / Upstash Redis HTTP REST API via POST body command arrays (e.g. `["SET", key, compressed, "EX", 47304000]`).
 - **Compression**: `lz-string` (`LZString.compressToEncodedURIComponent`). Compression is **100% byte-for-byte lossless**, guaranteeing perfect restoration of chords, lyrics, and metadata.
 - **18-Month Auto-Expiration**: Packets are saved with `EX 47304000` (18 months / 547.5 days in seconds).
-- **Automatic Renewal on UI View**: Navigating to `/#/p/:slug` fetches the packet via `GET /get/packet:<slug>` and fires a background `EXPIRE packet:<slug> 47304000` request to automatically reset the 18-month timer from the date of the user's visit.
-- **URL Slug Validation & Availability**: `checkSlugAvailability(slug)` calls Redis `EXISTS packet:<slug>` to provide real-time validation in the Save UI before committing.
+- **Automatic Renewal on UI View**: Navigating to `/#/p/:slug` fetches the packet via `POST ["GET", "packet:<slug>"]` and fires a background `POST ["EXPIRE", "packet:<slug>", 47304000]` request to automatically reset the 18-month timer from the date of the user's visit.
+- **URL Slug Validation & Availability**: `checkSlugAvailability(slug)` sends `POST ["EXISTS", "packet:<slug>"]` to provide real-time validation in the Save UI before committing.
 
 ---
 
