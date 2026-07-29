@@ -195,6 +195,15 @@ export function slugify(text) {
   return formatSlug(text);
 }
 
+export function formatLiveSlug(text) {
+  if (!text) return '';
+  return text
+    .toString()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-');
+}
+
 function getKvConfig() {
   const url = import.meta.env.VITE_KV_REST_API_URL;
   const token = import.meta.env.VITE_KV_REST_API_TOKEN;

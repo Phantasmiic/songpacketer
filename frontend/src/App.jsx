@@ -62,6 +62,7 @@ import {
   updateSongPacketTitle,
   deleteSongPacket,
   slugify,
+  formatLiveSlug,
   checkSlugAvailability,
   savePacketOnline,
   fetchPacketOnline,
@@ -1941,7 +1942,7 @@ function App() {
                 label="Custom URL"
                 size="small"
                 value={customSlug}
-                onChange={(e) => setCustomSlug(slugify(e.target.value))}
+                onChange={(e) => setCustomSlug(formatLiveSlug(e.target.value))}
                 fullWidth
                 placeholder="sunday-service"
                 InputProps={{

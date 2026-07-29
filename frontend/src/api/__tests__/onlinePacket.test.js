@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import LZString from 'lz-string';
 import {
   formatSlug,
+  formatLiveSlug,
   getRedisKey,
   slugify,
   checkSlugAvailability,
@@ -33,6 +34,13 @@ describe('Online Packet Storage & Lossless Compression Comprehensive Suite', () 
 
     it('slugify alias behaves identically to formatSlug', () => {
       expect(slugify('Youth Retreat 2026')).toBe('Youth-Retreat-2026');
+    });
+
+    it('formatLiveSlug allows trailing hyphens while actively typing', () => {
+      expect(formatLiveSlug('Sunday-')).toBe('Sunday-');
+      expect(formatLiveSlug('Sunday-Service-')).toBe('Sunday-Service-');
+      expect(formatLiveSlug('Sunday  Service')).toBe('Sunday-Service');
+      expect(formatLiveSlug('Sunday--Service')).toBe('Sunday-Service');
     });
   });
 
