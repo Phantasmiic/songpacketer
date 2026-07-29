@@ -105,103 +105,131 @@ function GenerateStep({
                 PAGE FITTING & BOUNDARIES
               </Typography>
 
-              <Box>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={requireOnePagePerSong}
-                      onChange={(event) => setRequireOnePagePerSong(event.target.checked)}
-                      color="primary"
-                    />
+              <RadioGroup
+                value={
+                  requireOnePagePerSong
+                    ? 'all'
+                    : enableForceNewPagePerSong
+                    ? 'specific'
+                    : 'none'
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'all') {
+                    setRequireOnePagePerSong(true);
+                    setEnableForceNewPagePerSong(false);
+                  } else if (val === 'specific') {
+                    setRequireOnePagePerSong(false);
+                    setEnableForceNewPagePerSong(true);
+                  } else {
+                    setRequireOnePagePerSong(false);
+                    setEnableForceNewPagePerSong(false);
                   }
+                }}
+              >
+                <FormControlLabel
+                  value="none"
+                  control={<Radio size="small" color="primary" />}
                   label={
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      Require each song to fit entirely on one page
-                    </Typography>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Flow songs naturally
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Songs fill columns and pages fluidly without forced page breaks.
+                      </Typography>
+                    </Box>
                   }
                 />
-                <Typography variant="caption" color="text.secondary" sx={{ pl: 4, display: 'block', mt: -0.5 }}>
-                  Pushes songs to start on a fresh page to avoid mid-song breaks. Adheres to your selected font size; if a song is too long to fit at the set font size, it may eventually go to the next page.
-                </Typography>
-              </Box>
-
-              <Box sx={{ mt: 0.5 }}>
                 <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={enableForceNewPagePerSong}
-                      onChange={(e) => setEnableForceNewPagePerSong(e.target.checked)}
-                      color="primary"
-                    />
-                  }
+                  value="all"
+                  control={<Radio size="small" color="primary" />}
                   label={
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      Force specific songs to start on a new page
-                    </Typography>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Require each song to fit entirely on one page
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Pushes songs to start on a fresh page to avoid mid-song breaks. Adheres to your selected font size; if a song is too long to fit at the set font size, it may eventually go to the next page.
+                      </Typography>
+                    </Box>
                   }
+                  sx={{ mt: 1 }}
                 />
-                <Typography variant="caption" color="text.secondary" sx={{ pl: 4, display: 'block', mt: -0.5 }}>
-                  Select individual songs to force them onto a fresh page or column.
-                </Typography>
+                <FormControlLabel
+                  value="specific"
+                  control={<Radio size="small" color="primary" />}
+                  label={
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Force specific songs to start on a new page
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Select individual songs below to force them onto a fresh page or column.
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ mt: 1 }}
+                />
+              </RadioGroup>
 
-                {enableForceNewPagePerSong && manualOrderCards.length > 0 && (
-                  <Box
-                    sx={{
-                      mt: 1.5,
-                      ml: 4,
-                      p: 1,
-                      bgcolor: 'background.paper',
-                      borderRadius: 1.5,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      maxHeight: 220,
-                      overflowY: 'auto',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 0.5
-                    }}
-                  >
-                    {manualOrderCards.map((card, index) => (
-                      <Box
-                        key={card.id}
-                        onClick={() => onToggleForceNewPage(card.id)}
+              {enableForceNewPagePerSong && !requireOnePagePerSong && manualOrderCards.length > 0 && (
+                <Box
+                  sx={{
+                    mt: 1,
+                    ml: 4,
+                    p: 1,
+                    bgcolor: 'background.paper',
+                    borderRadius: 1.5,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    maxHeight: 220,
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.5
+                  }}
+                >
+                  {manualOrderCards.map((card, index) => (
+                    <Box
+                      key={card.id}
+                      onClick={() => onToggleForceNewPage(card.id)}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1,
+                        cursor: 'pointer',
+                        bgcolor: card.forceNewPage ? 'action.selected' : 'transparent',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                    >
+                      <Checkbox
+                        size="small"
+                        checked={Boolean(card.forceNewPage)}
+                        onChange={() => onToggleForceNewPage(card.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        color="primary"
+                        sx={{ p: 0.25 }}
+                      />
+                      <Typography
+                        variant="body2"
                         sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1,
-                          px: 1,
-                          py: 0.5,
-                          borderRadius: 1,
-                          cursor: 'pointer',
-                          bgcolor: card.forceNewPage ? 'action.selected' : 'transparent',
-                          '&:hover': { bgcolor: 'action.hover' }
+                          fontWeight: card.forceNewPage ? 700 : 400,
+                          fontSize: '0.825rem',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
                         }}
                       >
-                        <Checkbox
-                          size="small"
-                          checked={Boolean(card.forceNewPage)}
-                          onChange={() => onToggleForceNewPage(card.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          color="primary"
-                          sx={{ p: 0.25 }}
-                        />
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: card.forceNewPage ? 700 : 400,
-                            fontSize: '0.825rem',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}
-                        >
-                          {index + 1}. {card.title}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
-                )}
-              </Box>
+                        {index + 1}. {card.title}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              )}
             </Stack>
           </Paper>
 
