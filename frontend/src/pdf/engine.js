@@ -104,9 +104,6 @@ export async function renderSongPacketPdf(
   function getOrCreatePage(pageIndex) {
     if (!pagesMap[pageIndex]) {
       pagesMap[pageIndex] = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      if (pageIndex >= indexPageCount) {
-        drawSongPageMarker(pagesMap[pageIndex], pageIndex - indexPageCount);
-      }
     }
     return pagesMap[pageIndex];
   }
@@ -115,9 +112,9 @@ export async function renderSongPacketPdf(
     return col === 0 ? LEFT_MARGIN : centerX;
   }
 
-  function drawSongPageMarker(pageObj, pageIndex) {
+  function drawSongPageMarker(pageObj, songPageIndex) {
     if (!showPageNumbers) return;
-    const pageNum = (startingPageNumber || 1) + pageIndex;
+    const pageNum = (startingPageNumber || 1) + songPageIndex;
     const prefix = pageNumberPrefix !== undefined ? pageNumberPrefix : 'S';
     const text = `${prefix}${pageNum}`;
     const tw = ctx.measureText(text, 'chord', 10);
@@ -247,6 +244,8 @@ export async function renderSongPacketPdf(
   }
 
   // --- DRAW SONGS DIRECTLY FROM SOLVER PLACEMENTS ---
+  const markedSongPages = new Set();
+
   for (const placement of layoutEval.placements) {
     if (placement.isSection) continue;
 
@@ -257,7 +256,14 @@ export async function renderSongPacketPdf(
     const songFontSize = songLayout.fontSize;
 
     for (const bPlacement of placement.blockPlacements) {
-      const pageObj = getOrCreatePage(bPlacement.pageIndex + indexPageCount);
+      const songPdfPageIndex = bPlacement.pageIndex + indexPageCount;
+      const pageObj = getOrCreatePage(songPdfPageIndex);
+
+      if (!markedSongPages.has(songPdfPageIndex)) {
+        markedSongPages.add(songPdfPageIndex);
+        drawSongPageMarker(pageObj, bPlacement.pageIndex);
+      }
+
       const currentX = xForCol(bPlacement.colIndex);
       let currentY = bPlacement.startY;
 
