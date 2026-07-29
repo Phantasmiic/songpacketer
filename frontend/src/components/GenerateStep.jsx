@@ -102,7 +102,7 @@ function GenerateStep({
           <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
             <Stack spacing={1.5}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                PAGE FITTING & BOUNDARIES
+                PAGE BREAKS & FLOW
               </Typography>
 
               <RadioGroup
@@ -237,7 +237,7 @@ function GenerateStep({
           <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
             <Stack spacing={1.5}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                SONG ARRANGEMENT & ORDERING
+                SONG ORDER & OPTIMIZATION
               </Typography>
               <RadioGroup
                 value={orderingMode}
