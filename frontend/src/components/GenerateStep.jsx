@@ -220,14 +220,18 @@ function GenerateStep({
                       <Typography
                         variant="body2"
                         sx={{
-                          fontWeight: card.forceNewPage ? 700 : 400,
                           fontSize: '0.825rem',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis'
                         }}
                       >
-                        {index + 1}. {card.title}
+                        <Box component="span" sx={{ fontWeight: 700, mr: 0.5 }}>
+                          {index + 1}.
+                        </Box>
+                        <Box component="span" sx={{ fontWeight: card.forceNewPage ? 700 : 400 }}>
+                          {card.title}
+                        </Box>
                       </Typography>
                     </Box>
                   ))}
